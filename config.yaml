@@ -1,0 +1,17 @@
+version: "1.0"
+date_timezone: "Asia/Taipei"
+
+banks:
+  - bank_id: esun
+    bank_name: "E.SUN Bank"
+    enabled: true
+    sender: "Service@info.esunbank.com"
+    title_pattern: '玉山銀行簽帳金融卡電子對帳單 \((?<roc_year>\d{2,3})(?<month>\d{1,2})\)'
+    offset:
+      year_offset: 0
+      month_offset: 0
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
+    parsers:
+      - type: "pdf-parse"

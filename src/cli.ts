@@ -35,23 +35,31 @@ program
   .command('fetch')
   .description('Fetch and parse bank statement emails into CSV')
   .option('-c, --config <path>', 'Path to YAML configuration file', 'config.yaml')
-  .option('-m, --month <YYYY-MM>', 'Target billing month (e.g. 2026-01)')
+  .requiredOption('-m, --month <YYYY-MM>', 'Target billing month (e.g. 2026-01)')
   .action(async (options) => {
     try {
       console.log(`Loading configuration from: ${options.config}...`);
       const config = loadConfig(options.config);
 
-      let targetYearMonth: { year: number; month: number } | undefined;
-      if (options.month) {
-        const parts = options.month.split('-');
-        if (parts.length !== 2 || isNaN(parseInt(parts[0], 10)) || isNaN(parseInt(parts[1], 10))) {
-          throw new Error('Invalid --month format. Expected YYYY-MM (e.g. 2026-01).');
-        }
-        targetYearMonth = {
-          year: parseInt(parts[0], 10),
-          month: parseInt(parts[1], 10),
-        };
-        console.log(`Filtering for billing cycle: ${targetYearMonth.year}-${String(targetYearMonth.month).padStart(2, '0')}`);
+      const parts = options.month.split('-');
+      if (parts.length !== 2) {
+        throw new Error('Invalid --month format. Expected YYYY-MM (e.g. 2026-01).');
+      }
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      if (isNaN(year) || isNaN(month) || month < 1 || month > 12 || parts[0].length !== 4) {
+        throw new Error('Invalid --month format. Expected YYYY-MM (e.g. 2026-01).');
+      }
+
+      const targetYearMonth = { year, month };
+      console.log(`Filtering for billing cycle: ${targetYearMonth.year}-${String(targetYearMonth.month).padStart(2, '0')}`);
+
+      const hasEncryptedBank = config.banks.some((b) => b.enabled && b.attachment?.encrypted);
+      const statementPassword = process.env.STATEMENT_PASSWORD;
+      if (hasEncryptedBank && (!statementPassword || statementPassword.trim().length === 0)) {
+        throw new Error(
+          'One or more enabled banks require encrypted attachment parsing, but STATEMENT_PASSWORD environment variable is not set. Please set STATEMENT_PASSWORD in your .env file or environment.'
+        );
       }
 
       console.log('Checking Gmail OAuth2 credentials...');
@@ -67,7 +75,7 @@ program
         console.log(`Processing Bank: ${bank.bank_name} (${bank.bank_id})`);
         console.log(`--------------------------------------------------`);
 
-        const attachments = await fetchBankAttachments(authClient, bank, targetYearMonth);
+        const attachments = await fetchBankAttachments(authClient, bank, targetYearMonth, statementPassword);
         if (attachments.length === 0) {
           console.log(`No attachments found for bank: ${bank.bank_id}`);
           continue;

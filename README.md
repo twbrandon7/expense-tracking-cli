@@ -146,13 +146,10 @@ npm run auth
 
 ### 3. Fetch & Parse Statements
 
-#### Fetch all statements matching configured rules:
-```bash
-npm run fetch
-```
-
 #### Fetch statements for a specific billing month:
 ```bash
+npm run fetch -- -m 2026-01
+# or
 npx ts-node src/cli.ts fetch --month 2026-01
 ```
 
