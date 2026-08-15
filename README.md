@@ -83,31 +83,39 @@ GEMINI_API_KEY=your_gemini_api_key_here
 Create a `config.yaml` in the project root (or reference `docs/example-config.yaml`):
 
 ```yaml
-attachment_dir: ./attachments
-output_file: ./transactions.csv
+version: "1.0"
+date_timezone: "Asia/Taipei"
 
 banks:
   - bank_id: cathay
-    bank_name: Cathay United Bank
+    bank_name: "Cathay United Bank"
     enabled: true
-    email_search_query: "from:cathaybk.com.tw subject:電子帳單"
-    subject_pattern: "(\\d{4})年(\\d{1,2})月"
-    year_offset: 0
-    month_offset: 0
+    sender: "creditcard@cathaybk.com.tw"
+    title_pattern: '國泰世華銀行信用卡(?<year>\d{4})年(?<month>\d{1,2})月電子對帳單'
+    offset:
+      year_offset: 0
+      month_offset: -1
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
     parsers:
-      - pdf-parse
-      - gemini
+      - type: "pdf-parse"
+      - type: "gemini"
 
   - bank_id: esun
-    bank_name: E.SUN Bank
+    bank_name: "E.SUN Bank"
     enabled: true
-    email_search_query: "from:esunbank.com.tw subject:信用卡帳單"
-    subject_pattern: "(\\d{4})[/-](\\d{1,2})"
-    year_offset: 0
-    month_offset: -1
+    sender: "esun-card@esunbank.com.tw"
+    title_pattern: '玉山銀行(?<roc_year>\d{2,3})年(?<month>\d{1,2})月信用卡電子'
+    offset:
+      year_offset: 0
+      month_offset: -1
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
     parsers:
-      - pdf-parse
-      - gemini
+      - type: "pdf-parse"
+      - type: "gemini"
 ```
 
 ---
