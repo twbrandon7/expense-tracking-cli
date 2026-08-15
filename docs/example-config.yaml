@@ -1,0 +1,125 @@
+# ==============================================================================
+# Bank Statement & Bill Email Fetcher Configuration
+# ==============================================================================
+# Overview:
+# This configuration defines fetching and parsing rules for bank statements and bills.
+#
+# Parsing & Date Calculation Logic:
+# ---------------------------------
+# 1. Date Extraction from Subject:
+#    - The email title is matched against `title_pattern` to extract the date string.
+#    - Required named regex groups:
+#        * Month: (?P<month>...)  -> 1 to 12
+#        * Year : MUST use EITHER (?P<year>...) (Gregorian, e.g., 2026)
+#                 OR (?P<roc_year>...) (Taiwan ROC/Minguo, e.g., 115 -> 115 + 1911 = 2026)
+#
+# 2. Billing Cycle Offset Calculation:
+#    - The offset values are applied directly to the parsed year and month from the title
+#      to compute the actual billing cycle (statement period):
+#        Actual Billing Period = Parsed (Year, Month) + (year_offset, month_offset)
+#      Example:
+#        - Extracted from title : Year = 2026, Month = 2 (e.g., "2026年02月份帳單")
+#        - Configured offset     : month_offset = -1, year_offset = 0
+#        - Calculated cycle      : 2026-01 (January 2026 billing cycle)
+# 3. Fallback Parser Chain:
+#    - `parsers` defines ordered list of statement parsers.
+#    - First parser executes. If extraction fails, next fallback parser runs (e.g. `pdf-parse` -> `gemini`).
+# ==============================================================================
+
+version: "1.0"
+date_timezone: "Asia/Taipei"
+
+banks:
+  # ----------------------------------------------------------------------------
+  # 1. CTBC Bank (中國信託) - ROC Year format (民國年)
+  # ----------------------------------------------------------------------------
+  - bank_id: "ctbc"
+    bank_name: "CTBC Bank (中國信託)"
+    enabled: true
+    sender: "ebill@ctbcbank.com"
+    # Matches: "【中國信託】民國115年02月份信用卡電子帳單通知"
+    # Extracted from title: roc_year=115 (2026), month=02
+    # Calculation: 2026-02 with month_offset: -1 -> Actual Billing Cycle: 2026-01
+    title_pattern: '【中國信託】民國(?P<roc_year>\d{2,3})年(?P<month>\d{1,2})月份信用卡電子帳單'
+    offset:
+      month_offset: -1
+      year_offset: 0
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
+    parsers:
+      - type: "pdf-parse"
+      - type: "gemini"
+
+
+  # ----------------------------------------------------------------------------
+  # 2. Cathay United Bank (國泰世華) - Gregorian Year format (西元年)
+  # ----------------------------------------------------------------------------
+  - bank_id: "cathay"
+    bank_name: "Cathay United Bank (國泰世華銀行)"
+    enabled: true
+    sender: "creditcard@cathaybk.com.tw"
+    # Matches: "國泰世華銀行信用卡2026年02月電子對帳單"
+    # Extracted from title: year=2026, month=02
+    # Calculation: 2026-02 with month_offset: -1 -> Actual Billing Cycle: 2026-01
+    title_pattern: '國泰世華銀行信用卡(?P<year>\d{4})年(?P<month>\d{1,2})月電子對帳單'
+    offset:
+      month_offset: -1
+      year_offset: 0
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
+
+  # ----------------------------------------------------------------------------
+  # 3. E.SUN Bank (玉山銀行) - ROC Year format
+  # ----------------------------------------------------------------------------
+  - bank_id: "esun"
+    bank_name: "E.SUN Bank (玉山銀行)"
+    enabled: true
+    sender: "esun-card@esunbank.com.tw"
+    # Matches: "玉山銀行115年02月信用卡電子帳單"
+    # Extracted from title: roc_year=115 (2026), month=02
+    # Calculation: 2026-02 with month_offset: -1 -> Actual Billing Cycle: 2026-01
+    title_pattern: '玉山銀行(?P<roc_year>\d{2,3})年(?P<month>\d{1,2})月信用卡電子'
+    offset:
+      month_offset: -1
+      year_offset: 0
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
+
+  # ----------------------------------------------------------------------------
+  # 4. Taishin Bank (台新銀行) - Slash Date format with ROC Year
+  # ----------------------------------------------------------------------------
+  - bank_id: "taishin"
+    bank_name: "Taishin Bank (台新國際商業銀行)"
+    enabled: true
+    sender: "statement@taishinbank.com.tw"
+    # Matches: "台新銀行信用卡電子帳單通知(115/01)"
+    # Extracted from title: roc_year=115 (2026), month=01
+    # Calculation: 2026-01 with month_offset: -1 -> Actual Billing Cycle: 2025-12
+    title_pattern: '台新銀行信用卡電子帳單通知\((?P<roc_year>\d{2,3})/(?P<month>\d{1,2})\)'
+    offset:
+      month_offset: -1
+      year_offset: 0
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
+
+  # ----------------------------------------------------------------------------
+  # 5. Taipei Fubon Bank (台北富邦銀行) - Zero Offset format
+  # ----------------------------------------------------------------------------
+  - bank_id: "fubon"
+    bank_name: "Taipei Fubon Bank (台北富邦銀行)"
+    enabled: true
+    sender: "ebill@fubon.com"
+    # Matches: "台北富邦銀行信用卡 2026年01月份 電子帳單"
+    # Extracted from title: year=2026, month=01
+    # Calculation: 2026-01 with month_offset: 0 -> Actual Billing Cycle: 2026-01
+    title_pattern: '台北富邦銀行信用卡\s*(?P<year>\d{4})年(?P<month>\d{1,2})月份'
+    offset:
+      month_offset: 0
+      year_offset: 0
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
