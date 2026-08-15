@@ -1,11 +1,14 @@
 import { BankParser, ParserConfig, ParserContext, TransactionRow } from '../types';
 import { PdfParseBankParser } from './pdf-parse';
 import { GeminiBankParser } from './gemini';
+import { EsunDebitPdfParser } from './esun';
 
 export class ParserChain {
   private parsers: Map<string, BankParser> = new Map();
 
-  constructor(initialParsers: BankParser[] = [new PdfParseBankParser(), new GeminiBankParser()]) {
+  constructor(
+    initialParsers: BankParser[] = [new EsunDebitPdfParser(), new PdfParseBankParser(), new GeminiBankParser()]
+  ) {
     for (const parser of initialParsers) {
       this.register(parser);
     }

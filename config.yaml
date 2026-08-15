@@ -14,4 +14,4 @@ banks:
       file_extension: ".pdf"
       encrypted: true
     parsers:
-      - type: "pdf-parse"
+      - type: "esun-debit"
