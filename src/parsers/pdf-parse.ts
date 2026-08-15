@@ -11,7 +11,8 @@ export class PdfParseBankParser implements BankParser {
     }
 
     const dataBuffer = fs.readFileSync(filePath);
-    const pdfData = await pdfParse(dataBuffer);
+    const pdfSource = context.password ? { data: dataBuffer, password: context.password } : dataBuffer;
+    const pdfData = await pdfParse(pdfSource as any);
     const text = pdfData.text;
 
     if (!text || text.trim().length === 0) {

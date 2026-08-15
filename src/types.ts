@@ -51,6 +51,7 @@ export interface ParserContext {
   emailSender: string;
   emailSubject: string;
   emailId: string;
+  password?: string;
 }
 
 export interface BankParser {

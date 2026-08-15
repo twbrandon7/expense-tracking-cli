@@ -37,7 +37,8 @@ export class GeminiBankParser implements BankParser {
     const dataBuffer = fs.readFileSync(filePath);
     let extractedText = '';
     try {
-      const pdfData = await pdfParse(dataBuffer);
+      const pdfSource = context.password ? { data: dataBuffer, password: context.password } : dataBuffer;
+      const pdfData = await pdfParse(pdfSource as any);
       extractedText = pdfData.text || '';
     } catch (err: any) {
       console.warn(
