@@ -171,10 +171,12 @@ Transactions are saved to `transactions.csv` (or the path specified in `config.y
 
 | Column | Description | Example |
 |---|---|---|
-| `transaction_date` | Date of the transaction (`YYYY-MM-DD`) | `2026-01-15` |
+| `transaction_date` | Date of the transaction (`YYYY-MM-DD`) | `2026-07-06` |
+| `description` | Item, merchant, or transaction description | `樂購蝦皮－ＡｓｉａＷｉＦｉ` |
 | `currency` | Currency code | `TWD` |
-| `amount` | Transaction amount (positive number) | `150` |
+| `amount` | Transaction amount (positive number) | `908` |
 | `type` | `income`, `expense`, `note`, or `investment` | `expense` |
-| `source_email_sender` | Email sender address | `statement@cathaybk.com.tw` |
-| `source_email_summary` | Transaction description / subject | `Uber Eats` |
-| `source_email_id` | Gmail Message ID | `18d45f9e2b10a8c2` |
+| `note` | Optional metadata (card suffix, FX amount, FX date) | `Card: 1719, Foreign: USD 6.35, FX Date: 07/02` |
+| `source_email_sender` | Email sender address | `Service@info.esunbank.com` |
+| `source_email_title` | Statement email title / subject | `玉山銀行簽帳金融卡電子對帳單(11507)` |
+| `source_email_id` | Gmail Message ID | `1a0038afce63d0c3` |

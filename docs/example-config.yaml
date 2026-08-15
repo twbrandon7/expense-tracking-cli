@@ -87,6 +87,10 @@ banks:
     attachment:
       file_extension: ".pdf"
       encrypted: true
+    parsers:
+      - type: "esun-debit"
+      - type: "pdf-parse"
+      - type: "gemini"
 
   # ----------------------------------------------------------------------------
   # 4. Taishin Bank (台新銀行) - Slash Date format with ROC Year

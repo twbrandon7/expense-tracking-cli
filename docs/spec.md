@@ -24,9 +24,8 @@ A Node.js & TypeScript CLI application that connects to Gmail via OAuth2 Desktop
 - **Environment Variables Resolution**: Load environment variables from `.env` file via `dotenv` first, falling back to system environment variables (`process.env`).
 - **Billing Cycle Offset**: Calculate statement period by combining regex-extracted year/month from email subject with per-bank `year_offset` and `month_offset`.
 
-- **Attachment Caching**: Check local disk before downloading email attachments; reuse existing files if present.
-- **Fallback Parser Chain**: Standardize parsers under a unified `BankParser` interface. Execute configured parsers in order; fallback to the next parser on extraction errors.
-- **Output Data Format**: Export parsed records with fields: transaction date, currency, amount, type (`income`, `expense`, `note`, `investment`), source email sender, source email summary, source email ID.
+- **Fallback Parser Chain**: Standardize parsers under a unified `BankParser` interface (e.g. `esun-debit`, `pdf-parse`, `gemini`). Execute configured parsers in order; fallback to the next parser on extraction errors.
+- **Output Data Format**: Export parsed records with fields: `transaction_date`, `description`, `currency`, `amount`, `type` (`income`, `expense`, `note`, `investment`), `note`, `source_email_sender`, `source_email_title`, `source_email_id`.
 
 ## Testing Decisions
 
