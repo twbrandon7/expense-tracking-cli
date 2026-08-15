@@ -21,7 +21,26 @@ export function getRedirectUri(): string {
 
   const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
   const { redirect_uris } = credentials.installed || credentials.web || {};
-  return redirect_uris?.[0] || 'http://localhost:3000/oauth2callback';
+  const configured = redirect_uris?.[0];
+
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      // If port is omitted (e.g. "http://localhost"), use localhost:3000/oauth2callback
+      if (!url.port) {
+        url.port = '3000';
+        if (url.pathname === '/' || !url.pathname) {
+          url.pathname = '/oauth2callback';
+        }
+        return url.toString().replace(/\/$/, '');
+      }
+      return configured;
+    } catch {
+      return configured;
+    }
+  }
+
+  return 'http://localhost:3000/oauth2callback';
 }
 
 export function getOAuth2Client(): OAuth2Client {
@@ -74,12 +93,20 @@ export async function authenticateInteractive(): Promise<void> {
   return new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
       try {
-        if (req.url && req.url.startsWith(pathname)) {
+        if (req.url) {
           const urlObj = new URL(req.url, `http://localhost:${port}`);
-          const code = urlObj.searchParams.get('code');
+          const error = urlObj.searchParams.get('error');
+          if (error) {
+            res.end(`Authentication denied: ${error}`);
+            server.close();
+            reject(new Error(`OAuth authorization denied: ${error}`));
+            return;
+          }
 
+          const code = urlObj.searchParams.get('code');
           if (code) {
-            res.end('Authentication successful! You can close this browser tab.');
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end('<h2>Authentication successful!</h2><p>You can close this browser tab.</p>');
             server.close();
 
             const { tokens } = await oAuth2Client.getToken(code);
@@ -88,13 +115,15 @@ export async function authenticateInteractive(): Promise<void> {
 
             console.log('Token successfully saved to token.json');
             resolve();
-          } else {
-            res.end('Authentication failed: Missing code parameter.');
+          } else if (urlObj.pathname === pathname) {
+            res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end('<h2>Authentication failed</h2><p>Missing authorization code parameter.</p>');
             reject(new Error('Missing authorization code in callback URL.'));
           }
         }
       } catch (err) {
-        res.end('Authentication error occurred.');
+        res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h2>Authentication error occurred.</h2>');
         reject(err);
       }
     });
