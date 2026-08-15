@@ -2,11 +2,13 @@ export type TransactionType = 'income' | 'expense' | 'note' | 'investment';
 
 export interface TransactionRow {
   transaction_date: string; // YYYY-MM-DD
+  description: string;
   currency: string;         // e.g. TWD, USD
   amount: number;
   type: TransactionType;
+  note?: string;
   source_email_sender: string;
-  source_email_summary: string;
+  source_email_title: string;
   source_email_id: string;
 }
 

@@ -9,6 +9,7 @@ interface GeminiResponseItem {
   amount?: number | string;
   type?: string;
   description?: string;
+  note?: string;
 }
 
 function validateTransactionType(value?: string): TransactionType {
@@ -53,10 +54,11 @@ export class GeminiBankParser implements BankParser {
 Extract all transaction records from the following bank statement text or bill details.
 Return ONLY a valid JSON array of objects with the following keys for each transaction:
 - transaction_date: string (YYYY-MM-DD format)
+- description: string (summary of store, item, or transaction)
 - currency: string (e.g. TWD, USD)
 - amount: number
 - type: string ("income", "expense", "note", or "investment")
-- description: string (summary of store, item, or transaction)
+- note: string (optional additional details like card suffix or foreign currency)
 
 Statement Text:
 ${extractedText.slice(0, 10000)}
@@ -83,11 +85,13 @@ ${extractedText.slice(0, 10000)}
       const cleanAmount = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount || '0')) || 0;
       return {
         transaction_date: item.transaction_date || `${context.billingPeriod.year}-${String(context.billingPeriod.month).padStart(2, '0')}-01`,
+        description: item.description || context.emailSubject,
         currency: item.currency || 'TWD',
         amount: cleanAmount,
         type: validateTransactionType(item.type),
+        note: item.note,
         source_email_sender: context.emailSender,
-        source_email_summary: item.description || context.emailSubject,
+        source_email_title: context.emailSubject,
         source_email_id: context.emailId,
       };
     });

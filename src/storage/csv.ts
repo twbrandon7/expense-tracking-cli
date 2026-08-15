@@ -7,11 +7,12 @@ import { TransactionRow } from '../types';
 function createRowKey(row: {
   source_email_id?: string;
   transaction_date?: string;
+  description?: string;
   amount?: number | string;
   currency?: string;
-  source_email_summary?: string;
+  note?: string;
 }): string {
-  return `${row.source_email_id || ''}#${row.transaction_date || ''}#${row.amount || ''}#${row.currency || ''}#${row.source_email_summary || ''}`;
+  return `${row.source_email_id || ''}#${row.transaction_date || ''}#${row.description || ''}#${row.amount || ''}#${row.currency || ''}#${row.note || ''}`;
 }
 
 function loadExistingKeyCounts(filePath: string): Map<string, number> {
@@ -28,11 +29,14 @@ function loadExistingKeyCounts(filePath: string): Map<string, number> {
   try {
     const records: Array<{
       transaction_date: string;
+      description?: string;
       currency: string;
       amount: string;
       type: string;
+      note?: string;
       source_email_sender: string;
-      source_email_summary: string;
+      source_email_title?: string;
+      source_email_summary?: string;
       source_email_id: string;
     }> = parse(content, {
       columns: true,
@@ -41,7 +45,14 @@ function loadExistingKeyCounts(filePath: string): Map<string, number> {
     });
 
     for (const record of records) {
-      const key = createRowKey(record);
+      const key = createRowKey({
+        source_email_id: record.source_email_id,
+        transaction_date: record.transaction_date,
+        description: record.description || record.source_email_summary,
+        amount: record.amount,
+        currency: record.currency,
+        note: record.note,
+      });
       counts.set(key, (counts.get(key) || 0) + 1);
     }
   } catch (err: any) {
@@ -80,11 +91,13 @@ export async function exportToCsv(rows: TransactionRow[], outputPath?: string): 
     path: filePath,
     header: [
       { id: 'transaction_date', title: 'transaction_date' },
+      { id: 'description', title: 'description' },
       { id: 'currency', title: 'currency' },
       { id: 'amount', title: 'amount' },
       { id: 'type', title: 'type' },
+      { id: 'note', title: 'note' },
       { id: 'source_email_sender', title: 'source_email_sender' },
-      { id: 'source_email_summary', title: 'source_email_summary' },
+      { id: 'source_email_title', title: 'source_email_title' },
       { id: 'source_email_id', title: 'source_email_id' },
     ],
     append: fileExists,

@@ -34,11 +34,12 @@ export class PdfParseBankParser implements BankParser {
         if (!isNaN(cleanAmount)) {
           rows.push({
             transaction_date: date.replace(/\//g, '-'),
+            description: description.trim(),
             currency: currency || 'TWD',
             amount: cleanAmount,
             type: 'expense',
             source_email_sender: context.emailSender,
-            source_email_summary: description.trim() || context.emailSubject,
+            source_email_title: context.emailSubject,
             source_email_id: context.emailId,
           });
         }
