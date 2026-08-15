@@ -31,6 +31,10 @@ Ordered sequence of `BankParser` implementations (e.g. `pdf-parse`, `gemini`). E
 ### Config Path Resolution
 CLI `--config` flag overrides config path. Defaults to `./config.yaml` in current working directory.
 
+### Environment Variables Resolution
+`dotenv` loads local `.env` file first; falls back to process environment variables (`process.env`).
+
+
 
 
 
