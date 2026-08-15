@@ -1,5 +1,7 @@
 node_modules/
 dist/
+downloads/
+
 .env
 token.json
 credentials.json
