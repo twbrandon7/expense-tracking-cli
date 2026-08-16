@@ -48,7 +48,7 @@ banks:
       file_extension: ".pdf"
       encrypted: true
     parsers:
-      - type: "pdf-parse"
+      - type: "ctbc-credit"
       - type: "gemini"
 
 

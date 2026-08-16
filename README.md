@@ -1,6 +1,6 @@
 # Expense Tracking CLI
 
-Automated CLI tool to retrieve electronic bank statements and bills from Gmail, extract monthly transaction records via a fallback parser chain (`pdf-parse` -> `gemini`), and export structured data to CSV.
+Automated CLI tool to retrieve electronic bank statements and bills from Gmail, extract monthly transaction records via bank-specific parsers (`esun-debit`, `ctbc-credit`) or generic fallback chain (`pdf-parse` -> `gemini`), and export structured data to CSV.
 
 ---
 
@@ -8,7 +8,7 @@ Automated CLI tool to retrieve electronic bank statements and bills from Gmail, 
 
 - **Gmail OAuth2 Integration**: Secure desktop authorization to read statement emails.
 - **Attachment Caching**: Automatically downloads and caches PDF attachments locally.
-- **Fallback Parser Chain**: Attempts fast local layout parsing (`pdf-parse`) and falls back to Gemini LLM (`gemini-2.5-flash`) if parsing fails.
+- **Bank-Specific & Fallback Parsers**: High-precision parsers for E.SUN (`esun-debit`) and CTBC (`ctbc-credit` with Gemini OCR for bitmap merchant names), plus generic fallback parser chain (`pdf-parse` -> `gemini`).
 - **Billing Offset Calculation**: Handles mismatch between email statement dates and actual transaction billing cycles.
 - **Structured CSV Export**: Saves clean, normalized transaction rows into `transactions.csv`.
 
@@ -87,26 +87,25 @@ version: "1.0"
 date_timezone: "Asia/Taipei"
 
 banks:
-  - bank_id: cathay
-    bank_name: "Cathay United Bank"
-    enabled: true
-    sender: "creditcard@cathaybk.com.tw"
-    title_pattern: '國泰世華銀行信用卡(?<year>\d{4})年(?<month>\d{1,2})月電子對帳單'
-    offset:
-      year_offset: 0
-      month_offset: -1
-    attachment:
-      file_extension: ".pdf"
-      encrypted: true
-    parsers:
-      - type: "pdf-parse"
-      - type: "gemini"
-
   - bank_id: esun
     bank_name: "E.SUN Bank"
     enabled: true
-    sender: "esun-card@esunbank.com.tw"
-    title_pattern: '玉山銀行(?<roc_year>\d{2,3})年(?<month>\d{1,2})月信用卡電子'
+    sender: "Service@info.esunbank.com"
+    title_pattern: '玉山銀行簽帳金融卡電子對帳單 \((?<roc_year>\d{2,3})(?<month>\d{1,2})\)'
+    offset:
+      year_offset: 0
+      month_offset: 0
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
+    parsers:
+      - type: "esun-debit"
+
+  - bank_id: ctbc
+    bank_name: "CTBC Bank"
+    enabled: true
+    sender: "ebill@estats.ctbcbank.com"
+    title_pattern: '中國信託信用卡電子帳單 (?<roc_year>\d{3})(?<month>\d{2})'
     offset:
       year_offset: 0
       month_offset: -1
@@ -114,8 +113,7 @@ banks:
       file_extension: ".pdf"
       encrypted: true
     parsers:
-      - type: "pdf-parse"
-      - type: "gemini"
+      - type: "ctbc-credit"
 ```
 
 ---

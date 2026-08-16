@@ -24,7 +24,7 @@ Parsed transaction rows exported to local CSV format (`transactions.csv`).
 OAuth2 Desktop client flow saving authorization credentials in `credentials.json` and session tokens in `token.json`.
 
 ### Parser Chain
-Ordered sequence of `BankParser` implementations (e.g. `esun-debit`, `pdf-parse`, `gemini`). Execute in priority order; fallback to next parser on extraction failure.
+Ordered sequence of `BankParser` implementations (e.g. `esun-debit`, `ctbc-credit`, `pdf-parse`, `gemini`). Execute in priority order; fallback to next parser on extraction failure.
 
 ### CLI Commands
 - `auth`: Interactive OAuth2 authentication flow. Saves tokens to `token.json`.
