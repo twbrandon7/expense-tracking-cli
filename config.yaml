@@ -15,3 +15,17 @@ banks:
       encrypted: true
     parsers:
       - type: "esun-debit"
+  - bank_id: ctbc
+    bank_name: "CTBC Bank"
+    enabled: true
+    sender: "ebill@estats.ctbcbank.com"
+    title_pattern: '中國信託信用卡電子帳單 (?<roc_year>\d{3})(?<month>\d{2})'
+    offset:
+      year_offset: 0
+      month_offset: -1
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
+    parsers:
+      - type: "ctbc-credit"
+

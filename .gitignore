@@ -5,3 +5,4 @@ downloads/
 .env
 token.json
 credentials.json
+*.csv
