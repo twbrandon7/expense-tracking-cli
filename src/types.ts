@@ -60,3 +60,35 @@ export interface BankParser {
   readonly id: string;
   parse(filePath: string, context: ParserContext): Promise<TransactionRow[]>;
 }
+
+export interface ClassificationRule {
+  pattern: string;
+  type: string;
+  sub_type: string;
+  is_regex?: boolean;
+}
+
+export interface ClassificationConfig {
+  base_currency: string;
+  user_rules: ClassificationRule[];
+  llm_rules: ClassificationRule[];
+}
+
+export interface ClassifiedSummaryRow {
+  type: string;
+  sub_type: string;
+  currency: string;
+  amount: number;
+  formula: string;
+  comment: string;
+}
+
+export interface CorrelatedTransactionGroup {
+  mainRow: TransactionRow;
+  feeRows: TransactionRow[];
+  refundRows: TransactionRow[];
+  type?: string;
+  sub_type?: string;
+  source?: 'user_rule' | 'llm_rule' | 'gemini' | 'unassigned';
+}
+
