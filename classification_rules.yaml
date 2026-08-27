@@ -32,9 +32,9 @@ user_rules:
   - pattern: YOUTUBE MEMBER
     type: 計畫
     sub_type: YouTube Member
-  - pattern: YOUTUBE
-    type: 計畫
-    sub_type: YouTube Premium
+  - pattern: YOUTUBE VIDEOS
+    type: 非計畫
+    sub_type: YouTube Movies
   - pattern: GITHUB
     type: 計畫
     sub_type: GitHub Pro
