@@ -3,13 +3,21 @@ import path from 'path';
 import http from 'http';
 import { URL } from 'url';
 import { google } from 'googleapis';
-import type { Auth } from 'googleapis';
+import type { Auth, sheets_v4 } from 'googleapis';
 
-const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
+const SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/spreadsheets'
+];
 const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
 const TOKEN_PATH = path.join(process.cwd(), 'token.json');
 
 export type OAuth2Client = Auth.OAuth2Client;
+
+export async function getSheetsClient(): Promise<sheets_v4.Sheets> {
+  const auth = await getAuthenticatedClient();
+  return google.sheets({ version: 'v4', auth });
+}
 
 
 export function getRedirectUri(): string {
