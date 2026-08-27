@@ -42,15 +42,19 @@ export async function classifyWithGeminiBatch(
 
   const ai = new GoogleGenAI({ apiKey });
   const taxonomy = extractTaxonomy(config);
+  const knownTypes = Object.keys(taxonomy);
+  const typesDesc = knownTypes.length > 0
+    ? knownTypes.map((t) => `"${t}"`).join(' or ')
+    : '"計畫" or "非計畫"';
 
   const systemInstruction = `You are a financial transaction classifier for personal expense tracking.
-Your task is to classify transaction expense items into category types: "計畫" (planned/fixed recurring expenses) or "非計畫" (unplanned/variable living expenses).
+Your task is to classify transaction expense items into category types (${typesDesc}).
 
 Current Taxonomy:
 ${JSON.stringify(taxonomy, null, 2)}
 
 Instructions:
-1. For each input item, assign a top-level category: "計畫" or "非計畫".
+1. For each input item, assign a top-level category type (${typesDesc}, or create a logical new type if needed).
 2. Assign a "sub_type":
    - Use an existing sub_type from the taxonomy if it matches well.
    - If none of the existing sub_types fit the transaction, create a concise, logical new sub_type in Traditional Chinese (e.g., "交通/高鐵", "日用品", "醫療/看診", "旅行/住宿", "娛樂", "百貨購物").

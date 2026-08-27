@@ -3,10 +3,7 @@ import yaml from 'js-yaml';
 import { ClassificationConfig, ClassificationRule } from '../types';
 
 export function extractTaxonomy(config: ClassificationConfig): Record<string, string[]> {
-  const taxonomy: Record<string, Set<string>> = {
-    '計畫': new Set<string>(),
-    '非計畫': new Set<string>()
-  };
+  const taxonomy: Record<string, Set<string>> = {};
 
   const allRules = [...config.user_rules, ...config.llm_rules];
   for (const rule of allRules) {

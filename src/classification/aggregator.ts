@@ -40,6 +40,18 @@ export async function aggregateTransactions(
   const baseCurrency = config.base_currency || 'TWD';
   const correlatedGroups = correlateTransactions(rows);
 
+  // Dynamically record rule type ordering
+  const typeOrderMap = new Map<string, number>();
+  let typeCounter = 0;
+  for (const r of [...config.user_rules, ...config.llm_rules]) {
+    if (r.type && !typeOrderMap.has(r.type)) {
+      typeOrderMap.set(r.type, typeCounter++);
+    }
+  }
+
+  const defaultType = Array.from(typeOrderMap.keys())[0] || 'Other';
+  const defaultIncomeType = Array.from(typeOrderMap.keys()).pop() || defaultType;
+
   const unclassifiedGroups: CorrelatedTransactionGroup[] = [];
 
   // Step 1: Match against user rules and LLM rules
@@ -66,7 +78,7 @@ export async function aggregateTransactions(
 
     // Handle special default cases (e.g. cashback or standalone fee)
     if (group.mainRow.type === 'income') {
-      group.type = '非計畫';
+      group.type = defaultIncomeType;
       group.sub_type = '回饋/其他收入';
       group.source = 'user_rule';
       continue;
@@ -97,9 +109,13 @@ export async function aggregateTransactions(
           },
           options?.configPath
         );
+
+        if (!typeOrderMap.has(result.type)) {
+          typeOrderMap.set(result.type, typeCounter++);
+        }
       } else {
         // Fallback when LLM is unavailable or fails
-        group.type = '非計畫';
+        group.type = defaultType;
         group.sub_type = '未分類';
         group.source = 'unassigned';
       }
@@ -114,7 +130,7 @@ export async function aggregateTransactions(
   }>();
 
   for (const group of correlatedGroups) {
-    const type = group.type || '非計畫';
+    const type = group.type || defaultType;
     const subType = group.sub_type || '未分類';
     const key = `${type}:::${subType}`;
 
@@ -185,16 +201,13 @@ export async function aggregateTransactions(
     });
   }
 
-  // Step 5: Sort summary rows: "計畫" first, then "非計畫"
-  const typeOrder = ['計畫', '非計畫'];
+  // Step 5: Sort summary rows by dynamic type appearance order then sub_type
   summaryRows.sort((a, b) => {
-    const orderA = typeOrder.indexOf(a.type);
-    const orderB = typeOrder.indexOf(b.type);
-    const idxA = orderA === -1 ? 99 : orderA;
-    const idxB = orderB === -1 ? 99 : orderB;
+    const orderA = typeOrderMap.has(a.type) ? typeOrderMap.get(a.type)! : 999;
+    const orderB = typeOrderMap.has(b.type) ? typeOrderMap.get(b.type)! : 999;
 
-    if (idxA !== idxB) {
-      return idxA - idxB;
+    if (orderA !== orderB) {
+      return orderA - orderB;
     }
     return a.sub_type.localeCompare(b.sub_type, 'zh-TW');
   });
