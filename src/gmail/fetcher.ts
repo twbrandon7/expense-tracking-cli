@@ -10,8 +10,10 @@ export interface FetchedAttachment {
   context: ParserContext;
 }
 
-function ensureBankDownloadDir(bankId: string): string {
-  const bankDownloadDir = path.join(process.cwd(), 'downloads', bankId);
+function ensureBankDownloadDir(bankId: string, customBaseDir?: string): string {
+  const bankDownloadDir = customBaseDir
+    ? path.join(customBaseDir, bankId)
+    : path.join(process.cwd(), 'downloads', bankId);
   if (!fs.existsSync(bankDownloadDir)) {
     fs.mkdirSync(bankDownloadDir, { recursive: true });
   }
@@ -64,7 +66,8 @@ export async function fetchBankAttachments(
   authClient: OAuth2Client,
   bank: BankConfig,
   targetYearMonth: { year: number; month: number },
-  password?: string
+  password?: string,
+  downloadsDir?: string
 ): Promise<FetchedAttachment[]> {
   const gmail = google.gmail({ version: 'v1', auth: authClient });
 
@@ -157,7 +160,7 @@ export async function fetchBankAttachments(
   };
 
   const results: FetchedAttachment[] = [];
-  const bankDownloadDir = ensureBankDownloadDir(bank.bank_id);
+  const bankDownloadDir = ensureBankDownloadDir(bank.bank_id, downloadsDir);
   const parts = matched.msg.payload?.parts || [];
   const pdfExt = bank.attachment.file_extension || '.pdf';
 

@@ -1,85 +1,80 @@
 base_currency: TWD
-
 user_rules:
-  # 計畫
-  - pattern: "房租|管理費"
-    type: "計畫"
-    sub_type: "房租/房貸+管理費"
+  - pattern: 房租|管理費
+    type: 計畫
+    sub_type: 房租/房貸+管理費
     is_regex: true
-  - pattern: "房貸.*還本"
-    type: "計畫"
-    sub_type: "房貸(每月還本金額)"
+  - pattern: 房貸.*還本
+    type: 計畫
+    sub_type: 房貸(每月還本金額)
     is_regex: true
-  - pattern: "房貸.*利息"
-    type: "計畫"
-    sub_type: "房貸(每月利息)"
+  - pattern: 房貸.*利息
+    type: 計畫
+    sub_type: 房貸(每月利息)
     is_regex: true
-  - pattern: "水費"
-    type: "計畫"
-    sub_type: "水費(每雙月1次)"
-  - pattern: "電費|台灣電力"
-    type: "計畫"
-    sub_type: "電費(每單月1次)"
+  - pattern: 水費
+    type: 計畫
+    sub_type: 水費(每雙月1次)
+  - pattern: 電費|台灣電力
+    type: 計畫
+    sub_type: 電費(每單月1次)
     is_regex: true
-  - pattern: "中華電信|遠傳|台灣大哥大|手機月租"
-    type: "計畫"
-    sub_type: "手機月租費"
+  - pattern: 中華電信|遠傳|台灣大哥大|手機月租
+    type: 計畫
+    sub_type: 手機月租費
     is_regex: true
-  - pattern: "VULTR"
-    type: "計畫"
-    sub_type: "網站月租費 (vultr)"
-  - pattern: "GOOGLE*CLOUD"
-    type: "計畫"
-    sub_type: "Google Cloud"
-  - pattern: "YOUTUBE MEMBER"
-    type: "計畫"
-    sub_type: "YouTube Member"
-  - pattern: "YOUTUBE"
-    type: "計畫"
-    sub_type: "YouTube Premium"
-  - pattern: "GITHUB"
-    type: "計畫"
-    sub_type: "GitHub Pro"
-  - pattern: "網域|GoDaddy|Namecheap|Cloudflare"
-    type: "計畫"
-    sub_type: "網域名稱年費"
+  - pattern: VULTR
+    type: 計畫
+    sub_type: 網站月租費 (vultr)
+  - pattern: GOOGLE*CLOUD
+    type: 計畫
+    sub_type: Google Cloud
+  - pattern: YOUTUBE MEMBER
+    type: 計畫
+    sub_type: YouTube Member
+  - pattern: YOUTUBE
+    type: 計畫
+    sub_type: YouTube Premium
+  - pattern: GITHUB
+    type: 計畫
+    sub_type: GitHub Pro
+  - pattern: 網域|GoDaddy|Namecheap|Cloudflare
+    type: 計畫
+    sub_type: 網域名稱年費
     is_regex: true
   - pattern: "2140"
-    type: "計畫"
-    sub_type: "2140訂閱"
-  - pattern: "車貸"
-    type: "計畫"
-    sub_type: "車貸"
-  - pattern: "紅包"
-    type: "計畫"
-    sub_type: "紅包"
-  - pattern: "保費|國泰人壽|富邦人壽|南山人壽|新光人壽|保險"
-    type: "計畫"
-    sub_type: "保費(意外/醫療/車險)"
+    type: 計畫
+    sub_type: 2140訂閱
+  - pattern: 車貸
+    type: 計畫
+    sub_type: 車貸
+  - pattern: 紅包
+    type: 計畫
+    sub_type: 紅包
+  - pattern: 保費|國泰人壽|富邦人壽|南山人壽|新光人壽|保險
+    type: 計畫
+    sub_type: 保費(意外/醫療/車險)
     is_regex: true
-
-  # 非計畫
-  - pattern: "拉亞漢堡|麥味登|阿郎餐飲|餐飲"
-    type: "非計畫"
-    sub_type: "餐飲"
+  - pattern: 拉亞漢堡|麥味登|阿郎餐飲|餐飲
+    type: 非計畫
+    sub_type: 餐飲
     is_regex: true
-  - pattern: "衣服|鞋|UNIQLO|NET|ZARA|GU"
-    type: "非計畫"
-    sub_type: "衣服鞋子"
+  - pattern: 衣服|鞋|UNIQLO|NET|ZARA|GU
+    type: 非計畫
+    sub_type: 衣服鞋子
     is_regex: true
-  - pattern: "電子|3C|光華|原價屋|小婷包膜|熊老闆"
-    type: "非計畫"
-    sub_type: "電子產品"
+  - pattern: 電子|3C|光華|原價屋|小婷包膜|熊老闆
+    type: 非計畫
+    sub_type: 電子產品
     is_regex: true
-  - pattern: "機車|機油|保養|輪胎"
-    type: "非計畫"
-    sub_type: "機車保養維修"
+  - pattern: 機車|機油|保養|輪胎
+    type: 非計畫
+    sub_type: 機車保養維修
     is_regex: true
-  - pattern: "台灣中油|中油|加油|全國加油"
-    type: "非計畫"
-    sub_type: "油錢"
+  - pattern: 台灣中油|中油|加油|全國加油
+    type: 非計畫
+    sub_type: 油錢
     is_regex: true
-
 llm_rules:
   - pattern: ＡｓｉａＷｉＦｉ
     type: 非計畫
@@ -120,3 +115,9 @@ llm_rules:
   - pattern: 遠東百貨
     type: 非計畫
     sub_type: 百貨購物
+  - pattern: 麗寶OUTLET MAL
+    type: 非計畫
+    sub_type: 百貨購物
+  - pattern: 童綜
+    type: 非計畫
+    sub_type: 醫療/看診

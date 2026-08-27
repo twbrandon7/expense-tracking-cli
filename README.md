@@ -142,69 +142,106 @@ npm run auth
 
 ---
 
-### 3. Fetch & Parse Statements
+### 3. Workspace Structure
 
-#### Fetch statements for a specific billing month:
-```bash
-npm run fetch -- -m 2026-01
-# or
-npx ts-node src/cli.ts fetch --month 2026-01
+By default, all downloads, transaction records, and classification summaries are organized by month inside the `./workspace/` directory:
+
+```
+workspace/
+└── 2026-07/
+    ├── downloads/
+    │   ├── ctbc/
+    │   └── esun/
+    ├── transactions.csv
+    └── classified_summary.csv
 ```
 
-#### Use a custom configuration file:
-```bash
-npx ts-node src/cli.ts fetch --config custom-config.yaml --month 2026-01
-```
-
-#### Run with compiled code:
-```bash
-node dist/cli.js fetch -m 2026-01
-```
+Custom base workspace directories can be specified with `-w, --workspace <dir>`.
 
 ---
 
-### 4. Classify Transactions & Aggregation
+### 4. Fetch & Parse Statements
 
-Classifies raw transactions according to rules and Gemini reasoning, producing aggregated summary rows with formulas and transaction comments:
+Downloads bank statement PDFs for the specified billing month into `workspace/<YYYY-MM>/downloads/` and extracts transactions into `workspace/<YYYY-MM>/transactions.csv`:
 
 ```bash
-npm run classify
+npm run fetch -- -m 2026-07
 # or
-npx ts-node src/cli.ts classify -i transactions.csv -o classified_summary.csv
+npx ts-node src/cli.ts fetch --month 2026-07
 ```
+
+Options:
+- `-m, --month <YYYY-MM>` (Required)
+- `-w, --workspace <dir>` (Default: `workspace`)
+- `-c, --config <path>` (Default: `config.yaml`)
+- `-o, --output <path>` (Override default transactions CSV path)
 
 ---
 
-### 5. Google Sheets Synchronization
+### 5. Classify Transactions & Aggregation
 
-Synchronizes classified expenses into your Google Sheet tab (automatically resolved using approximate matching on year, e.g. `2026`, or by passing `--sheet-name`):
+Classifies raw transactions according to rules and Gemini reasoning, producing aggregated summary rows into `workspace/<YYYY-MM>/classified_summary.csv`:
+
+```bash
+npm run classify -- -m 2026-07
+# or custom input/output
+npx ts-node src/cli.ts classify -i workspace/2026-07/transactions.csv -o workspace/2026-07/classified_summary.csv
+```
+
+Options:
+- `-m, --month <YYYY-MM>` (Target month for workspace path resolution)
+- `-w, --workspace <dir>` (Default: `workspace`)
+- `-i, --input <path>` (Override input transactions CSV)
+- `-o, --output <path>` (Override output summary CSV)
+- `-r, --rules <path>` (Default: `classification_rules.yaml`)
+- `-c, --config <path>` (Default: `config.yaml`)
+
+---
+
+### 6. Google Sheets Synchronization
+
+Synchronizes classified summary rows from `workspace/<YYYY-MM>/classified_summary.csv` into your Google Sheet tab:
 
 ```bash
 npm run sync-sheets -- -m 2026-07
-# or
-npx ts-node src/cli.ts sync-sheets --month 2026-07 -i classified_summary.csv
-# or specify exact/approximate sheet tab name
+# or specify custom input or sheet name
 npx ts-node src/cli.ts sync-sheets --month 2026-07 --sheet-name "2026年(空白表單)"
 ```
 
-> **Note on Sheet Tab Matching**:
-> - If no `--sheet-name` is given, the CLI performs approximate matching for the specified year (e.g. `2026`).
-> - If exactly one tab matches, it is selected.
-> - If multiple tabs match (or none match), the CLI throws an error listing all available tabs and asks you to disambiguate using `--sheet-name` or `sheet_name` in `config.yaml`.
+Options:
+- `-m, --month <YYYY-MM>` (Required)
+- `-w, --workspace <dir>` (Default: `workspace`)
+- `-i, --input <path>` (Override summary CSV path)
+- `-c, --config <path>` (Default: `config.yaml`)
+- `-s, --spreadsheet-id <id>` (Google Sheets spreadsheet ID override)
+- `--sheet-name <name>` (Specific sheet tab name override)
 
-#### Chained Execution:
-You can also run classification and Google Sheets sync in a single command:
+---
+
+### 7. Run Full Pipeline (`run`)
+
+Executes the complete end-to-end workflow (`fetch` -> `classify` -> `sync-sheets`) in one command:
+
 ```bash
-npx ts-node src/cli.ts classify -m 2026-07 --sync-sheets
-# or during fetch
-npx ts-node src/cli.ts fetch -m 2026-07 --sync-sheets
+npm run run -- -m 2026-07
+# or
+npx ts-node src/cli.ts run -m 2026-07
+```
+
+#### Skip specific steps:
+```bash
+# Skip fetching, re-classify and sync existing transactions
+npx ts-node src/cli.ts run -m 2026-07 --skip-fetch
+
+# Fetch and classify without uploading to Google Sheets
+npx ts-node src/cli.ts run -m 2026-07 --skip-sheets
 ```
 
 ---
 
 ## Output Format
 
-Transactions are saved to `transactions.csv` (or the path specified in `config.yaml`):
+Transactions are saved to `workspace/<YYYY-MM>/transactions.csv` (or the path specified via CLI):
 
 | Column | Description | Example |
 |---|---|---|

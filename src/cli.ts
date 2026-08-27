@@ -13,7 +13,195 @@ import { readTransactionsCsv, exportSummaryCsv, readSummaryCsv } from './storage
 import { loadClassificationConfig } from './classification/rules';
 import { aggregateTransactions } from './classification/aggregator';
 import { syncClassifiedSummaryToSheets } from './storage/sheets-sync';
+import { resolveWorkspacePaths } from './workspace';
 import { TransactionRow } from './types';
+
+function parseYearMonth(monthStr: string): { year: number; month: number } {
+  const parts = monthStr.split('-');
+  if (parts.length !== 2) {
+    throw new Error('Invalid --month format. Expected YYYY-MM (e.g. 2026-01).');
+  }
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  if (isNaN(year) || isNaN(month) || month < 1 || month > 12 || parts[0].length !== 4) {
+    throw new Error('Invalid --month format. Expected YYYY-MM (e.g. 2026-01).');
+  }
+  return { year, month };
+}
+
+export async function runFetchStep(options: {
+  month: string;
+  workspace?: string;
+  configPath?: string;
+  outputPath?: string;
+}): Promise<string> {
+  const targetYearMonth = parseYearMonth(options.month);
+  const configPath = options.configPath || 'config.yaml';
+  console.log(`Loading configuration from: ${configPath}...`);
+  const config = loadConfig(configPath);
+
+  const paths = resolveWorkspacePaths({
+    workspace: options.workspace,
+    month: options.month,
+    transactionsCsv: options.outputPath,
+  });
+
+  console.log(`Filtering for billing cycle: ${targetYearMonth.year}-${String(targetYearMonth.month).padStart(2, '0')}`);
+  console.log(`Workspace directory: ${paths.monthDir || paths.workspaceDir}`);
+
+  const hasEncryptedBank = config.banks.some((b) => b.enabled && b.attachment?.encrypted);
+  const statementPassword = process.env.STATEMENT_PASSWORD;
+  if (hasEncryptedBank && (!statementPassword || statementPassword.trim().length === 0)) {
+    throw new Error(
+      'One or more enabled banks require encrypted attachment parsing, but STATEMENT_PASSWORD environment variable is not set. Please set STATEMENT_PASSWORD in your .env file or environment.'
+    );
+  }
+
+  console.log('Checking Gmail OAuth2 credentials...');
+  const authClient = await getAuthenticatedClient();
+
+  const parserChain = new ParserChain();
+  const allTransactions: TransactionRow[] = [];
+
+  for (const bank of config.banks) {
+    if (!bank.enabled) continue;
+
+    console.log(`\n--------------------------------------------------`);
+    console.log(`Processing Bank: ${bank.bank_name} (${bank.bank_id})`);
+    console.log(`--------------------------------------------------`);
+
+    const attachments = await fetchBankAttachments(
+      authClient,
+      bank,
+      targetYearMonth,
+      statementPassword,
+      paths.downloadsDir
+    );
+
+    if (attachments.length === 0) {
+      console.log(`No attachments found for bank: ${bank.bank_id}`);
+      continue;
+    }
+
+    for (const item of attachments) {
+      try {
+        const rows = await parserChain.parse(item.filePath, item.context, bank.parsers);
+        allTransactions.push(...rows);
+      } catch (err: any) {
+        console.error(`Failed to parse attachment ${item.filePath}:`, err.message || err);
+      }
+    }
+  }
+
+  console.log(`\n==================================================`);
+  if (allTransactions.length > 0) {
+    const csvPath = await exportToCsv(allTransactions, paths.transactionsCsvPath);
+    console.log(`Fetch complete! Extracted ${allTransactions.length} transaction rows -> ${csvPath}`);
+    console.log(`==================================================\n`);
+    return csvPath;
+  } else {
+    console.log('Fetch complete! No transactions extracted.');
+    console.log(`==================================================\n`);
+    return paths.transactionsCsvPath;
+  }
+}
+
+export async function runClassifyStep(options: {
+  month?: string;
+  workspace?: string;
+  inputPath?: string;
+  outputPath?: string;
+  rulesPath?: string;
+  configPath?: string;
+}): Promise<string> {
+  const paths = resolveWorkspacePaths({
+    workspace: options.workspace,
+    month: options.month,
+    transactionsCsv: options.inputPath,
+    summaryCsv: options.outputPath,
+  });
+
+  console.log(`Reading transactions from: ${paths.transactionsCsvPath}...`);
+  if (!fs.existsSync(paths.transactionsCsvPath)) {
+    throw new Error(`Transactions CSV not found at: ${paths.transactionsCsvPath}`);
+  }
+
+  const rows = readTransactionsCsv(paths.transactionsCsvPath);
+  if (rows.length === 0) {
+    console.log('No transactions found to classify.');
+    return paths.summaryCsvPath;
+  }
+  console.log(`Loaded ${rows.length} transactions.`);
+
+  const rulesPath = options.rulesPath || 'classification_rules.yaml';
+  console.log(`Loading classification rules from: ${rulesPath}...`);
+  const classificationConfig = loadClassificationConfig(rulesPath);
+
+  console.log('Classifying and aggregating transactions...');
+  const summaryRows = await aggregateTransactions(rows, classificationConfig, {
+    configPath: rulesPath,
+  });
+
+  const outPath = await exportSummaryCsv(summaryRows, paths.summaryCsvPath);
+  console.log(`\n==================================================`);
+  console.log(`Classification complete! Generated ${summaryRows.length} summary rows -> ${outPath}`);
+  console.log(`==================================================\n`);
+  return outPath;
+}
+
+export async function runSyncSheetsStep(options: {
+  month: string;
+  workspace?: string;
+  inputPath?: string;
+  configPath?: string;
+  spreadsheetId?: string;
+  sheetName?: string;
+}): Promise<void> {
+  parseYearMonth(options.month);
+
+  const paths = resolveWorkspacePaths({
+    workspace: options.workspace,
+    month: options.month,
+    summaryCsv: options.inputPath,
+  });
+
+  const configPath = options.configPath || 'config.yaml';
+  const appConfig = fs.existsSync(configPath) ? loadConfig(configPath) : undefined;
+  const spreadsheetId = options.spreadsheetId || appConfig?.spreadsheet_id;
+  const sheetName = options.sheetName || appConfig?.sheet_name;
+
+  if (!spreadsheetId) {
+    throw new Error('Spreadsheet ID must be specified via --spreadsheet-id or in config.yaml under spreadsheet_id');
+  }
+
+  console.log(`Reading summary from ${paths.summaryCsvPath}...`);
+  if (!fs.existsSync(paths.summaryCsvPath)) {
+    throw new Error(`Classified summary CSV not found at: ${paths.summaryCsvPath}`);
+  }
+
+  const summaryRows = readSummaryCsv(paths.summaryCsvPath);
+  if (summaryRows.length === 0) {
+    console.log('No summary rows found to sync.');
+    return;
+  }
+  console.log(`Loaded ${summaryRows.length} summary rows.`);
+
+  console.log(`Syncing to Google Sheets (${spreadsheetId}) for month ${options.month}...`);
+  const result = await syncClassifiedSummaryToSheets({
+    spreadsheetId,
+    yearMonth: options.month,
+    sheetName,
+    summaryRows,
+  });
+
+  console.log(`\n==================================================`);
+  console.log(`Google Sheets sync complete!`);
+  console.log(`Sheet Tab: ${result.sheetTitle}`);
+  console.log(`Target Month: ${result.month}月 (${result.year})`);
+  console.log(`Rows Updated: ${result.updatedCount}`);
+  console.log(`Rows Inserted: ${result.insertedCount}`);
+  console.log(`==================================================\n`);
+}
 
 const program = new Command();
 
@@ -37,59 +225,45 @@ program
   });
 
 program
-  .command('classify')
-  .description('Classify transactions CSV into aggregated expense summary CSV')
-  .option('-i, --input <path>', 'Path to input transactions CSV', 'transactions.csv')
-  .option('-o, --output <path>', 'Path to output summary CSV', 'classified_summary.csv')
-  .option('-r, --rules <path>', 'Path to classification rules YAML', 'classification_rules.yaml')
+  .command('fetch')
+  .description('Fetch and parse bank statement emails into transactions CSV')
+  .requiredOption('-m, --month <YYYY-MM>', 'Target billing month (e.g. 2026-07)')
+  .option('-w, --workspace <dir>', 'Root workspace directory', 'workspace')
   .option('-c, --config <path>', 'Path to YAML configuration file', 'config.yaml')
-  .option('--sync-sheets', 'Automatically sync summary to Google Sheets after classification')
-  .option('-m, --month <YYYY-MM>', 'Billing month for Google Sheets sync (e.g. 2026-07)')
-  .option('-s, --spreadsheet-id <id>', 'Google Sheets spreadsheet ID (overrides config.yaml)')
-  .option('--sheet-name <name>', 'Specific sheet tab name (overrides config.yaml sheet_name)')
+  .option('-o, --output <path>', 'Path to output transactions CSV (overrides default workspace path)')
   .action(async (options) => {
     try {
-      console.log(`Reading transactions from: ${options.input}...`);
-      const rows = readTransactionsCsv(options.input);
-      if (rows.length === 0) {
-        console.log('No transactions found to classify.');
-        return;
-      }
-      console.log(`Loaded ${rows.length} transactions.`);
-
-      console.log(`Loading classification rules from: ${options.rules}...`);
-      const classificationConfig = loadClassificationConfig(options.rules);
-
-      console.log('Classifying and aggregating transactions...');
-      const summaryRows = await aggregateTransactions(rows, classificationConfig, {
-        configPath: options.rules
+      await runFetchStep({
+        month: options.month,
+        workspace: options.workspace,
+        configPath: options.config,
+        outputPath: options.output,
       });
+    } catch (err: any) {
+      console.error('Fetch command failed:', err.message || err);
+      process.exit(1);
+    }
+  });
 
-      const outPath = await exportSummaryCsv(summaryRows, options.output);
-      console.log(`\n==================================================`);
-      console.log(`Classification complete! Generated ${summaryRows.length} summary rows -> ${outPath}`);
-      console.log(`==================================================\n`);
-
-      if (options.syncSheets) {
-        if (!options.month) {
-          throw new Error('--month <YYYY-MM> is required when --sync-sheets is enabled.');
-        }
-        const appConfig = fs.existsSync(options.config) ? loadConfig(options.config) : undefined;
-        const spreadsheetId = options.spreadsheetId || appConfig?.spreadsheet_id;
-        const sheetName = options.sheetName || appConfig?.sheet_name;
-        if (!spreadsheetId) {
-          throw new Error('Spreadsheet ID must be specified via --spreadsheet-id or config.yaml spreadsheet_id');
-        }
-
-        console.log(`\nSyncing to Google Sheets (${spreadsheetId})...`);
-        const result = await syncClassifiedSummaryToSheets({
-          spreadsheetId,
-          yearMonth: options.month,
-          sheetName,
-          summaryRows
-        });
-        console.log(`\nGoogle Sheets Sync complete! Updated: ${result.updatedCount} rows, Inserted: ${result.insertedCount} rows in "${result.sheetTitle}" (${result.month}月)`);
-      }
+program
+  .command('classify')
+  .description('Classify transactions CSV into aggregated expense summary CSV')
+  .option('-m, --month <YYYY-MM>', 'Target billing month for workspace path resolution (e.g. 2026-07)')
+  .option('-w, --workspace <dir>', 'Root workspace directory', 'workspace')
+  .option('-i, --input <path>', 'Path to input transactions CSV (overrides default workspace path)')
+  .option('-o, --output <path>', 'Path to output summary CSV (overrides default workspace path)')
+  .option('-r, --rules <path>', 'Path to classification rules YAML', 'classification_rules.yaml')
+  .option('-c, --config <path>', 'Path to YAML configuration file', 'config.yaml')
+  .action(async (options) => {
+    try {
+      await runClassifyStep({
+        month: options.month,
+        workspace: options.workspace,
+        inputPath: options.input,
+        outputPath: options.output,
+        rulesPath: options.rules,
+        configPath: options.config,
+      });
     } catch (err: any) {
       console.error('Classify command failed:', err.message || err);
       process.exit(1);
@@ -100,42 +274,21 @@ program
   .command('sync-sheets')
   .description('Sync classified summary CSV into Google Sheets')
   .requiredOption('-m, --month <YYYY-MM>', 'Target billing month (e.g. 2026-07)')
-  .option('-i, --input <path>', 'Path to classified summary CSV', 'classified_summary.csv')
+  .option('-w, --workspace <dir>', 'Root workspace directory', 'workspace')
+  .option('-i, --input <path>', 'Path to classified summary CSV (overrides default workspace path)')
   .option('-c, --config <path>', 'Path to YAML configuration file', 'config.yaml')
   .option('-s, --spreadsheet-id <id>', 'Google Sheets spreadsheet ID (overrides config.yaml)')
   .option('--sheet-name <name>', 'Specific sheet tab name (overrides config.yaml sheet_name)')
   .action(async (options) => {
     try {
-      const appConfig = fs.existsSync(options.config) ? loadConfig(options.config) : undefined;
-      const spreadsheetId = options.spreadsheetId || appConfig?.spreadsheet_id;
-      const sheetName = options.sheetName || appConfig?.sheet_name;
-      if (!spreadsheetId) {
-        throw new Error('Spreadsheet ID must be specified via --spreadsheet-id or in config.yaml under spreadsheet_id');
-      }
-
-      console.log(`Reading summary from ${options.input}...`);
-      const summaryRows = readSummaryCsv(options.input);
-      if (summaryRows.length === 0) {
-        console.log('No summary rows found to sync.');
-        return;
-      }
-      console.log(`Loaded ${summaryRows.length} summary rows.`);
-
-      console.log(`Syncing to Google Sheets (${spreadsheetId}) for month ${options.month}...`);
-      const result = await syncClassifiedSummaryToSheets({
-        spreadsheetId,
-        yearMonth: options.month,
-        sheetName,
-        summaryRows
+      await runSyncSheetsStep({
+        month: options.month,
+        workspace: options.workspace,
+        inputPath: options.input,
+        configPath: options.config,
+        spreadsheetId: options.spreadsheetId,
+        sheetName: options.sheetName,
       });
-
-      console.log(`\n==================================================`);
-      console.log(`Google Sheets sync complete!`);
-      console.log(`Sheet Tab: ${result.sheetTitle}`);
-      console.log(`Target Month: ${result.month}月 (${result.year})`);
-      console.log(`Rows Updated: ${result.updatedCount}`);
-      console.log(`Rows Inserted: ${result.insertedCount}`);
-      console.log(`==================================================\n`);
     } catch (err: any) {
       console.error('Sync-sheets command failed:', err.message || err);
       process.exit(1);
@@ -143,111 +296,75 @@ program
   });
 
 program
-  .command('fetch')
-  .description('Fetch and parse bank statement emails into CSV')
+  .command('run')
+  .description('Run end-to-end pipeline: Fetch -> Classify -> Sync to Google Sheets')
+  .requiredOption('-m, --month <YYYY-MM>', 'Target billing month (e.g. 2026-07)')
+  .option('-w, --workspace <dir>', 'Root workspace directory', 'workspace')
   .option('-c, --config <path>', 'Path to YAML configuration file', 'config.yaml')
   .option('-r, --rules <path>', 'Path to classification rules YAML', 'classification_rules.yaml')
-  .option('-o, --output <path>', 'Path to output summary CSV', 'classified_summary.csv')
-  .option('--no-classify', 'Skip auto-classification after fetching')
-  .option('--sync-sheets', 'Automatically sync summary to Google Sheets after fetching & classifying')
+  .option('--transactions-csv <path>', 'Path to transactions CSV (overrides default workspace path)')
+  .option('-o, --summary-csv <path>', 'Path to summary CSV (overrides default workspace path)')
   .option('-s, --spreadsheet-id <id>', 'Google Sheets spreadsheet ID (overrides config.yaml)')
   .option('--sheet-name <name>', 'Specific sheet tab name (overrides config.yaml sheet_name)')
-  .requiredOption('-m, --month <YYYY-MM>', 'Target billing month (e.g. 2026-01)')
+  .option('--skip-fetch', 'Skip fetching email attachments and parsing')
+  .option('--skip-classify', 'Skip classifying transactions into summary CSV')
+  .option('--skip-sheets', 'Skip syncing summary to Google Sheets')
   .action(async (options) => {
     try {
-      console.log(`Loading configuration from: ${options.config}...`);
-      const config = loadConfig(options.config);
+      console.log(`\n==================================================`);
+      console.log(`Starting full pipeline for month: ${options.month}`);
+      console.log(`==================================================\n`);
 
-      const parts = options.month.split('-');
-      if (parts.length !== 2) {
-        throw new Error('Invalid --month format. Expected YYYY-MM (e.g. 2026-01).');
-      }
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10);
-      if (isNaN(year) || isNaN(month) || month < 1 || month > 12 || parts[0].length !== 4) {
-        throw new Error('Invalid --month format. Expected YYYY-MM (e.g. 2026-01).');
-      }
-
-      const targetYearMonth = { year, month };
-      console.log(`Filtering for billing cycle: ${targetYearMonth.year}-${String(targetYearMonth.month).padStart(2, '0')}`);
-
-      const hasEncryptedBank = config.banks.some((b) => b.enabled && b.attachment?.encrypted);
-      const statementPassword = process.env.STATEMENT_PASSWORD;
-      if (hasEncryptedBank && (!statementPassword || statementPassword.trim().length === 0)) {
-        throw new Error(
-          'One or more enabled banks require encrypted attachment parsing, but STATEMENT_PASSWORD environment variable is not set. Please set STATEMENT_PASSWORD in your .env file or environment.'
-        );
+      // 1. Fetch step
+      if (!options.skipFetch) {
+        console.log(`[Pipeline Step 1/3] Fetching bank statement emails...`);
+        await runFetchStep({
+          month: options.month,
+          workspace: options.workspace,
+          configPath: options.config,
+          outputPath: options.transactionsCsv,
+        });
+      } else {
+        console.log(`[Pipeline Step 1/3] Skipping fetch step (--skip-fetch).`);
       }
 
-      console.log('Checking Gmail OAuth2 credentials...');
-      const authClient = await getAuthenticatedClient();
+      // 2. Classify step
+      if (!options.skipClassify) {
+        console.log(`[Pipeline Step 2/3] Classifying and aggregating transactions...`);
+        await runClassifyStep({
+          month: options.month,
+          workspace: options.workspace,
+          inputPath: options.transactionsCsv,
+          outputPath: options.summaryCsv,
+          rulesPath: options.rules,
+          configPath: options.config,
+        });
+      } else {
+        console.log(`[Pipeline Step 2/3] Skipping classification step (--skip-classify).`);
+      }
 
-      const parserChain = new ParserChain();
-      const allTransactions: TransactionRow[] = [];
-
-      for (const bank of config.banks) {
-        if (!bank.enabled) continue;
-
-        console.log(`\n--------------------------------------------------`);
-        console.log(`Processing Bank: ${bank.bank_name} (${bank.bank_id})`);
-        console.log(`--------------------------------------------------`);
-
-        const attachments = await fetchBankAttachments(authClient, bank, targetYearMonth, statementPassword);
-        if (attachments.length === 0) {
-          console.log(`No attachments found for bank: ${bank.bank_id}`);
-          continue;
-        }
-
-        for (const item of attachments) {
-          try {
-            const rows = await parserChain.parse(item.filePath, item.context, bank.parsers);
-            allTransactions.push(...rows);
-          } catch (err: any) {
-            console.error(`Failed to parse attachment ${item.filePath}:`, err.message || err);
-          }
-        }
+      // 3. Sync sheets step
+      if (!options.skipSheets) {
+        console.log(`[Pipeline Step 3/3] Syncing summary to Google Sheets...`);
+        await runSyncSheetsStep({
+          month: options.month,
+          workspace: options.workspace,
+          inputPath: options.summaryCsv,
+          configPath: options.config,
+          spreadsheetId: options.spreadsheetId,
+          sheetName: options.sheetName,
+        });
+      } else {
+        console.log(`[Pipeline Step 3/3] Skipping Google Sheets sync step (--skip-sheets).`);
       }
 
       console.log(`\n==================================================`);
-      if (allTransactions.length > 0) {
-        const csvPath = await exportToCsv(allTransactions);
-        console.log(`Pipeline complete! Extracted total ${allTransactions.length} transaction rows -> ${csvPath}`);
-
-        if (options.classify && fs.existsSync(options.rules)) {
-          console.log(`\nAuto-classifying all transactions in ${csvPath}...`);
-          const allRows = readTransactionsCsv(csvPath);
-          const classificationConfig = loadClassificationConfig(options.rules);
-          const summaryRows = await aggregateTransactions(allRows, classificationConfig, {
-            configPath: options.rules
-          });
-          const outSummaryPath = await exportSummaryCsv(summaryRows, options.output);
-          console.log(`Summary generated -> ${outSummaryPath}`);
-
-          if (options.syncSheets) {
-            const spreadsheetId = options.spreadsheetId || config.spreadsheet_id;
-            const sheetName = options.sheetName || config.sheet_name;
-            if (!spreadsheetId) {
-              throw new Error('Spreadsheet ID must be specified via --spreadsheet-id or config.yaml spreadsheet_id');
-            }
-            console.log(`\nAuto-syncing summary to Google Sheets (${spreadsheetId})...`);
-            const result = await syncClassifiedSummaryToSheets({
-              spreadsheetId,
-              yearMonth: options.month,
-              sheetName,
-              summaryRows
-            });
-            console.log(`Google Sheets Sync complete! Updated: ${result.updatedCount} rows, Inserted: ${result.insertedCount} rows in "${result.sheetTitle}" (${result.month}月)`);
-          }
-        }
-      } else {
-        console.log('Pipeline complete! No transactions extracted.');
-      }
+      console.log(`Full pipeline execution completed successfully!`);
       console.log(`==================================================\n`);
     } catch (err: any) {
-      console.error('Fetch command failed:', err.message || err);
+      console.error('Pipeline execution failed:', err.message || err);
       process.exit(1);
     }
   });
 
 program.parse(process.argv);
-

@@ -17,24 +17,18 @@ Parsed expense/income record extracted from bank statements or bills. Contains:
 ### Billing Cycle
 Target statement period computed by applying `month_offset` and `year_offset` to parsed year/month from email subject.
 
-### Output Storage
-Parsed transaction rows exported to local CSV format (`transactions.csv`).
-
-### Gmail Authentication
-OAuth2 Desktop client flow saving authorization credentials in `credentials.json` and session tokens in `token.json`.
-
-### Parser Chain
-Ordered sequence of `BankParser` implementations (e.g. `esun-debit`, `ctbc-credit`, `pdf-parse`, `gemini`). Execute in priority order; fallback to next parser on extraction failure.
-
-### Google Sheets Synchronization
-Exports aggregated and classified summary rows into Google Sheets tabs partitioned by year (e.g. `2026`). Matches sub-types in Column D under `負債` (`計劃` / `非計劃`), appends formulas/values and detailed transaction notes, and automatically inserts new rows for unlisted sub-types with sum and percentage formulas.
+### Workspace Directory
+Default root `./workspace` directory organized by month (`workspace/<YYYY-MM>/`):
+- `workspace/<YYYY-MM>/downloads/<bank_id>/`: Downloaded bank statement PDFs.
+- `workspace/<YYYY-MM>/transactions.csv`: Extracted transaction rows.
+- `workspace/<YYYY-MM>/classified_summary.csv`: Aggregated classification summary.
 
 ### CLI Commands
 - `auth`: Interactive OAuth2 authentication flow for Gmail and Google Sheets. Saves tokens to `token.json`.
-- `fetch`: Downloads and parses bills into CSV. Accepts target month/year parameters (e.g. `--month 2026-01`).
-- `classify`: Classifies transactions CSV into aggregated expense summary CSV.
+- `fetch`: Downloads statement PDFs and parses transactions into `workspace/<YYYY-MM>/transactions.csv`. Requires `--month <YYYY-MM>`.
+- `classify`: Classifies transactions into `workspace/<YYYY-MM>/classified_summary.csv` using rules and Gemini.
 - `sync-sheets`: Synchronizes classified summary CSV into Google Sheets for the specified month (e.g. `--month 2026-07`).
-
+- `run`: End-to-end pipeline executing `fetch` -> `classify` -> `sync-sheets` sequentially with skip flags (`--skip-fetch`, `--skip-classify`, `--skip-sheets`).
 
 ### Config Path Resolution
 CLI `--config` flag overrides config path. Defaults to `./config.yaml` in current working directory.
