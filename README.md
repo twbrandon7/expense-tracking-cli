@@ -163,6 +163,45 @@ node dist/cli.js fetch -m 2026-01
 
 ---
 
+### 4. Classify Transactions & Aggregation
+
+Classifies raw transactions according to rules and Gemini reasoning, producing aggregated summary rows with formulas and transaction comments:
+
+```bash
+npm run classify
+# or
+npx ts-node src/cli.ts classify -i transactions.csv -o classified_summary.csv
+```
+
+---
+
+### 5. Google Sheets Synchronization
+
+Synchronizes classified expenses into your Google Sheet tab (automatically resolved using approximate matching on year, e.g. `2026`, or by passing `--sheet-name`):
+
+```bash
+npm run sync-sheets -- -m 2026-07
+# or
+npx ts-node src/cli.ts sync-sheets --month 2026-07 -i classified_summary.csv
+# or specify exact/approximate sheet tab name
+npx ts-node src/cli.ts sync-sheets --month 2026-07 --sheet-name "2026年(空白表單)"
+```
+
+> **Note on Sheet Tab Matching**:
+> - If no `--sheet-name` is given, the CLI performs approximate matching for the specified year (e.g. `2026`).
+> - If exactly one tab matches, it is selected.
+> - If multiple tabs match (or none match), the CLI throws an error listing all available tabs and asks you to disambiguate using `--sheet-name` or `sheet_name` in `config.yaml`.
+
+#### Chained Execution:
+You can also run classification and Google Sheets sync in a single command:
+```bash
+npx ts-node src/cli.ts classify -m 2026-07 --sync-sheets
+# or during fetch
+npx ts-node src/cli.ts fetch -m 2026-07 --sync-sheets
+```
+
+---
+
 ## Output Format
 
 Transactions are saved to `transactions.csv` (or the path specified in `config.yaml`):
@@ -178,3 +217,4 @@ Transactions are saved to `transactions.csv` (or the path specified in `config.y
 | `source_email_sender` | Email sender address | `Service@info.esunbank.com` |
 | `source_email_title` | Statement email title / subject | `玉山銀行簽帳金融卡電子對帳單(11507)` |
 | `source_email_id` | Gmail Message ID | `1a0038afce63d0c3` |
+
