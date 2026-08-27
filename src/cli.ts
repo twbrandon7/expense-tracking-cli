@@ -9,9 +9,10 @@ import { authenticateInteractive, getAuthenticatedClient } from './auth/gmail-au
 import { fetchBankAttachments } from './gmail/fetcher';
 import { ParserChain } from './parsers/chain';
 import { exportToCsv } from './storage/csv';
-import { readTransactionsCsv, exportSummaryCsv } from './storage/summary-csv';
+import { readTransactionsCsv, exportSummaryCsv, readSummaryCsv } from './storage/summary-csv';
 import { loadClassificationConfig } from './classification/rules';
 import { aggregateTransactions } from './classification/aggregator';
+import { syncClassifiedSummaryToSheets } from './storage/sheets-sync';
 import { TransactionRow } from './types';
 
 const program = new Command();
@@ -23,10 +24,10 @@ program
 
 program
   .command('auth')
-  .description('Authorize CLI access to Gmail via OAuth2 Desktop flow')
+  .description('Authorize CLI access to Gmail and Google Sheets via OAuth2 Desktop flow')
   .action(async () => {
     try {
-      console.log('Starting interactive Gmail OAuth authorization...');
+      console.log('Starting interactive Google OAuth authorization (Gmail + Google Sheets)...');
       await authenticateInteractive();
       console.log('Authentication setup complete.');
     } catch (err: any) {
@@ -41,6 +42,11 @@ program
   .option('-i, --input <path>', 'Path to input transactions CSV', 'transactions.csv')
   .option('-o, --output <path>', 'Path to output summary CSV', 'classified_summary.csv')
   .option('-r, --rules <path>', 'Path to classification rules YAML', 'classification_rules.yaml')
+  .option('-c, --config <path>', 'Path to YAML configuration file', 'config.yaml')
+  .option('--sync-sheets', 'Automatically sync summary to Google Sheets after classification')
+  .option('-m, --month <YYYY-MM>', 'Billing month for Google Sheets sync (e.g. 2026-07)')
+  .option('-s, --spreadsheet-id <id>', 'Google Sheets spreadsheet ID (overrides config.yaml)')
+  .option('--sheet-name <name>', 'Specific sheet tab name (overrides config.yaml sheet_name)')
   .action(async (options) => {
     try {
       console.log(`Reading transactions from: ${options.input}...`);
@@ -63,8 +69,75 @@ program
       console.log(`\n==================================================`);
       console.log(`Classification complete! Generated ${summaryRows.length} summary rows -> ${outPath}`);
       console.log(`==================================================\n`);
+
+      if (options.syncSheets) {
+        if (!options.month) {
+          throw new Error('--month <YYYY-MM> is required when --sync-sheets is enabled.');
+        }
+        const appConfig = fs.existsSync(options.config) ? loadConfig(options.config) : undefined;
+        const spreadsheetId = options.spreadsheetId || appConfig?.spreadsheet_id;
+        const sheetName = options.sheetName || appConfig?.sheet_name;
+        if (!spreadsheetId) {
+          throw new Error('Spreadsheet ID must be specified via --spreadsheet-id or config.yaml spreadsheet_id');
+        }
+
+        console.log(`\nSyncing to Google Sheets (${spreadsheetId})...`);
+        const result = await syncClassifiedSummaryToSheets({
+          spreadsheetId,
+          yearMonth: options.month,
+          sheetName,
+          summaryRows
+        });
+        console.log(`\nGoogle Sheets Sync complete! Updated: ${result.updatedCount} rows, Inserted: ${result.insertedCount} rows in "${result.sheetTitle}" (${result.month}月)`);
+      }
     } catch (err: any) {
       console.error('Classify command failed:', err.message || err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('sync-sheets')
+  .description('Sync classified summary CSV into Google Sheets')
+  .requiredOption('-m, --month <YYYY-MM>', 'Target billing month (e.g. 2026-07)')
+  .option('-i, --input <path>', 'Path to classified summary CSV', 'classified_summary.csv')
+  .option('-c, --config <path>', 'Path to YAML configuration file', 'config.yaml')
+  .option('-s, --spreadsheet-id <id>', 'Google Sheets spreadsheet ID (overrides config.yaml)')
+  .option('--sheet-name <name>', 'Specific sheet tab name (overrides config.yaml sheet_name)')
+  .action(async (options) => {
+    try {
+      const appConfig = fs.existsSync(options.config) ? loadConfig(options.config) : undefined;
+      const spreadsheetId = options.spreadsheetId || appConfig?.spreadsheet_id;
+      const sheetName = options.sheetName || appConfig?.sheet_name;
+      if (!spreadsheetId) {
+        throw new Error('Spreadsheet ID must be specified via --spreadsheet-id or in config.yaml under spreadsheet_id');
+      }
+
+      console.log(`Reading summary from ${options.input}...`);
+      const summaryRows = readSummaryCsv(options.input);
+      if (summaryRows.length === 0) {
+        console.log('No summary rows found to sync.');
+        return;
+      }
+      console.log(`Loaded ${summaryRows.length} summary rows.`);
+
+      console.log(`Syncing to Google Sheets (${spreadsheetId}) for month ${options.month}...`);
+      const result = await syncClassifiedSummaryToSheets({
+        spreadsheetId,
+        yearMonth: options.month,
+        sheetName,
+        summaryRows
+      });
+
+      console.log(`\n==================================================`);
+      console.log(`Google Sheets sync complete!`);
+      console.log(`Sheet Tab: ${result.sheetTitle}`);
+      console.log(`Target Month: ${result.month}月 (${result.year})`);
+      console.log(`Rows Updated: ${result.updatedCount}`);
+      console.log(`Rows Inserted: ${result.insertedCount}`);
+      console.log(`==================================================\n`);
+    } catch (err: any) {
+      console.error('Sync-sheets command failed:', err.message || err);
       process.exit(1);
     }
   });
@@ -76,6 +149,9 @@ program
   .option('-r, --rules <path>', 'Path to classification rules YAML', 'classification_rules.yaml')
   .option('-o, --output <path>', 'Path to output summary CSV', 'classified_summary.csv')
   .option('--no-classify', 'Skip auto-classification after fetching')
+  .option('--sync-sheets', 'Automatically sync summary to Google Sheets after fetching & classifying')
+  .option('-s, --spreadsheet-id <id>', 'Google Sheets spreadsheet ID (overrides config.yaml)')
+  .option('--sheet-name <name>', 'Specific sheet tab name (overrides config.yaml sheet_name)')
   .requiredOption('-m, --month <YYYY-MM>', 'Target billing month (e.g. 2026-01)')
   .action(async (options) => {
     try {
@@ -146,6 +222,22 @@ program
           });
           const outSummaryPath = await exportSummaryCsv(summaryRows, options.output);
           console.log(`Summary generated -> ${outSummaryPath}`);
+
+          if (options.syncSheets) {
+            const spreadsheetId = options.spreadsheetId || config.spreadsheet_id;
+            const sheetName = options.sheetName || config.sheet_name;
+            if (!spreadsheetId) {
+              throw new Error('Spreadsheet ID must be specified via --spreadsheet-id or config.yaml spreadsheet_id');
+            }
+            console.log(`\nAuto-syncing summary to Google Sheets (${spreadsheetId})...`);
+            const result = await syncClassifiedSummaryToSheets({
+              spreadsheetId,
+              yearMonth: options.month,
+              sheetName,
+              summaryRows
+            });
+            console.log(`Google Sheets Sync complete! Updated: ${result.updatedCount} rows, Inserted: ${result.insertedCount} rows in "${result.sheetTitle}" (${result.month}月)`);
+          }
         }
       } else {
         console.log('Pipeline complete! No transactions extracted.');
@@ -158,3 +250,4 @@ program
   });
 
 program.parse(process.argv);
+
