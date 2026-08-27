@@ -56,3 +56,32 @@ export async function exportSummaryCsv(
   await csvWriter.writeRecords(rows);
   return resolvedPath;
 }
+
+export function readSummaryCsv(filePath: string): ClassifiedSummaryRow[] {
+  const resolvedPath = path.resolve(process.cwd(), filePath);
+  if (!fs.existsSync(resolvedPath)) {
+    throw new Error(`Summary CSV file not found: ${resolvedPath}`);
+  }
+
+  const content = fs.readFileSync(resolvedPath, 'utf8');
+  if (!content.trim()) {
+    return [];
+  }
+
+  const records: any[] = parse(content, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+    relax_column_count: true
+  });
+
+  return records.map((r) => ({
+    type: r.type || '',
+    sub_type: r.sub_type || '',
+    currency: r.currency || 'TWD',
+    amount: parseFloat(r.amount) || 0,
+    formula: r.formula || '',
+    comment: r.comment || ''
+  }));
+}
+

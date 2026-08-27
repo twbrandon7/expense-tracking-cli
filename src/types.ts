@@ -41,6 +41,8 @@ export interface BankConfig {
 export interface AppConfig {
   version: string;
   date_timezone: string;
+  spreadsheet_id?: string;
+  sheet_name?: string;
   banks: BankConfig[];
 }
 
