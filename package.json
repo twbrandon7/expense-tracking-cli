@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "auth": "ts-node src/cli.ts auth",
-    "fetch": "ts-node src/cli.ts fetch"
+    "fetch": "ts-node src/cli.ts fetch",
+    "classify": "ts-node src/cli.ts classify"
   },
   "dependencies": {
     "@google/genai": "^2.17.1",
