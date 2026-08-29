@@ -145,3 +145,9 @@ llm_rules:
   - pattern: 無卡提優
     type: 帳務處理
     sub_type: 無卡提款
+  - pattern: 麗寶 OUTLETMAL
+    type: 非計畫
+    sub_type: 百貨購物
+  - pattern: 費用
+    type: 非計畫
+    sub_type: 銀行手續費

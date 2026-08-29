@@ -7,6 +7,7 @@ import {
 import { matchRule, recordLlmRule } from './rules';
 import { correlateTransactions } from './correlator';
 import { classifyWithGeminiBatch } from './llm';
+import { createDefaultFilterPipeline } from './filters';
 
 export interface AggregateOptions {
   configPath?: string;
@@ -38,7 +39,9 @@ export async function aggregateTransactions(
   options?: AggregateOptions
 ): Promise<ClassifiedSummaryRow[]> {
   const baseCurrency = config.base_currency || 'TWD';
-  const correlatedGroups = correlateTransactions(rows);
+  const filterPipeline = createDefaultFilterPipeline();
+  const { activeRows } = filterPipeline.filter(rows);
+  const correlatedGroups = correlateTransactions(activeRows);
 
   // Dynamically record rule type ordering
   const typeOrderMap = new Map<string, number>();
