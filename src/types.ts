@@ -64,8 +64,15 @@ export interface BankParser {
   parse(filePath: string, context: ParserContext): Promise<TransactionRow[]>;
 }
 
+export interface TransactionClassifier<TOptions = any> {
+  readonly id: string;
+  match(row: TransactionRow, options: TOptions): boolean;
+}
+
 export interface ClassificationRule {
-  pattern: string;
+  pattern?: string;
+  classifier?: string;
+  options?: Record<string, any>;
   type: string;
   sub_type: string;
   is_regex?: boolean;

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import yaml from 'js-yaml';
-import { ClassificationConfig, ClassificationRule } from '../types';
+import { ClassificationConfig, ClassificationRule, TransactionRow } from '../types';
+import { ClassifierRegistry, defaultClassifierRegistry } from './classifiers';
 
 export function extractTaxonomy(config: ClassificationConfig): Record<string, string[]> {
   const taxonomy: Record<string, Set<string>> = {};
@@ -56,25 +57,62 @@ export function saveClassificationConfig(filePath: string, config: Classificatio
   fs.writeFileSync(filePath, yamlContent, 'utf8');
 }
 
-export function matchRule(description: string, rules: ClassificationRule[]): ClassificationRule | null {
-  for (const rule of rules) {
-    if (!rule.pattern) continue;
+export function matchRule(
+  target: string | TransactionRow,
+  rules: ClassificationRule[],
+  registry: ClassifierRegistry = defaultClassifierRegistry
+): ClassificationRule | null {
+  const row: TransactionRow = typeof target === 'string'
+    ? {
+        transaction_date: '',
+        description: target,
+        currency: 'TWD',
+        amount: 0,
+        type: 'expense',
+        source_email_sender: '',
+        source_email_title: '',
+        source_email_id: ''
+      }
+    : target;
 
-    if (rule.is_regex) {
+  for (const rule of rules) {
+    // 1. Code-based classifier matching
+    if (rule.classifier) {
+      const classifier = registry.get(rule.classifier);
+      if (!classifier) {
+        console.warn(`[ClassifierRegistry] Classifier "${rule.classifier}" not found in registry.`);
+        continue;
+      }
+
       try {
-        const regex = new RegExp(rule.pattern, 'i');
-        if (regex.test(description)) {
+        if (classifier.match(row, rule.options || {})) {
           return rule;
         }
-      } catch {
-        // Fallback to substring match if regex invalid
+      } catch (err: any) {
+        console.warn(`[ClassifierRegistry] Classifier "${rule.classifier}" error: ${err.message || err}`);
+      }
+      continue;
+    }
+
+    // 2. Pattern matching
+    if (rule.pattern) {
+      const description = row.description;
+      if (rule.is_regex) {
+        try {
+          const regex = new RegExp(rule.pattern, 'i');
+          if (regex.test(description)) {
+            return rule;
+          }
+        } catch {
+          // Fallback to substring match if regex invalid
+          if (description.toLowerCase().includes(rule.pattern.toLowerCase())) {
+            return rule;
+          }
+        }
+      } else {
         if (description.toLowerCase().includes(rule.pattern.toLowerCase())) {
           return rule;
         }
-      }
-    } else {
-      if (description.toLowerCase().includes(rule.pattern.toLowerCase())) {
-        return rule;
       }
     }
   }
@@ -87,9 +125,11 @@ export function recordLlmRule(
   newRule: ClassificationRule,
   configPath?: string
 ): void {
+  if (!newRule.pattern) return;
+
   // Check if rule pattern already exists in llm_rules or user_rules
-  const existsInUser = config.user_rules.some((r) => r.pattern.toLowerCase() === newRule.pattern.toLowerCase());
-  const existsInLlm = config.llm_rules.some((r) => r.pattern.toLowerCase() === newRule.pattern.toLowerCase());
+  const existsInUser = config.user_rules.some((r) => r.pattern && r.pattern.toLowerCase() === newRule.pattern!.toLowerCase());
+  const existsInLlm = config.llm_rules.some((r) => r.pattern && r.pattern.toLowerCase() === newRule.pattern!.toLowerCase());
 
   if (!existsInUser && !existsInLlm) {
     config.llm_rules.push(newRule);

@@ -62,7 +62,7 @@ export async function aggregateTransactions(
     const desc = group.mainRow.description;
 
     // Check user rules first
-    const userMatch = matchRule(desc, config.user_rules);
+    const userMatch = matchRule(group.mainRow, config.user_rules);
     if (userMatch) {
       group.type = userMatch.type;
       group.sub_type = userMatch.sub_type;
@@ -71,7 +71,7 @@ export async function aggregateTransactions(
     }
 
     // Check cached LLM rules
-    const llmMatch = matchRule(desc, config.llm_rules);
+    const llmMatch = matchRule(group.mainRow, config.llm_rules);
     if (llmMatch) {
       group.type = llmMatch.type;
       group.sub_type = llmMatch.sub_type;
