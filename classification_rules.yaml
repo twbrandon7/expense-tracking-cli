@@ -1,13 +1,12 @@
 base_currency: TWD
 user_rules:
-  - pattern: 房租|管理費
+  - classifier: house_rental
+    options:
+      description: 行銀非約跨優 中*郵政
+      counterparty: "700 0000213950***357"
+      is_regex: false
     type: 計畫
     sub_type: 房租/房貸+管理費
-    is_regex: true
-  - pattern: 房貸.*還本
-    type: 計畫
-    sub_type: 房貸(每月還本金額)
-    is_regex: true
   - pattern: 房貸.*利息
     type: 計畫
     sub_type: 房貸(每月利息)
