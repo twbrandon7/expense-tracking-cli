@@ -121,3 +121,27 @@ llm_rules:
   - pattern: 童綜
     type: 非計畫
     sub_type: 醫療/看診
+  - pattern: 證交款扣款
+    type: 投資
+    sub_type: 證券交易
+  - pattern: Ｄ*卡
+    type: 非計畫
+    sub_type: 銀行手續費
+  - pattern: 中*郵政
+    type: 帳務處理
+    sub_type: 跨行轉帳
+  - pattern: 連結帳戶交易
+    type: 帳務處理
+    sub_type: 連結帳戶轉帳
+  - pattern: 元*銀行
+    type: 帳務處理
+    sub_type: 跨行轉帳
+  - pattern: 網路本行轉帳
+    type: 帳務處理
+    sub_type: 本行轉帳
+  - pattern: 連*銀行
+    type: 帳務處理
+    sub_type: 跨行轉帳
+  - pattern: 無卡提優
+    type: 帳務處理
+    sub_type: 無卡提款
