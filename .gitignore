@@ -1,8 +1,7 @@
 node_modules/
 dist/
-downloads/
+workspace/
 
 .env
 token.json
 credentials.json
-*.csv
