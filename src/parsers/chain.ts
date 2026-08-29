@@ -2,6 +2,7 @@ import { BankParser, ParserConfig, ParserContext, TransactionRow } from '../type
 import { PdfParseBankParser } from './pdf-parse';
 import { GeminiBankParser } from './gemini';
 import { EsunDebitPdfParser } from './esun';
+import { EsunStatementPdfParser } from './esun-statement';
 import { CtbcCreditPdfParser } from './ctbc';
 
 export class ParserChain {
@@ -9,6 +10,7 @@ export class ParserChain {
 
   constructor(
     initialParsers: BankParser[] = [
+      new EsunStatementPdfParser(),
       new EsunDebitPdfParser(),
       new CtbcCreditPdfParser(),
       new PdfParseBankParser(),
