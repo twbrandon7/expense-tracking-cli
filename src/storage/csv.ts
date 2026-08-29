@@ -11,8 +11,9 @@ function createRowKey(row: {
   amount?: number | string;
   currency?: string;
   note?: string;
+  parser?: string;
 }): string {
-  return `${row.source_email_id || ''}#${row.transaction_date || ''}#${row.description || ''}#${row.amount || ''}#${row.currency || ''}#${row.note || ''}`;
+  return `${row.source_email_id || ''}#${row.transaction_date || ''}#${row.description || ''}#${row.amount || ''}#${row.currency || ''}#${row.note || ''}#${row.parser || ''}`;
 }
 
 function loadExistingKeyCounts(filePath: string): Map<string, number> {
@@ -34,6 +35,7 @@ function loadExistingKeyCounts(filePath: string): Map<string, number> {
       amount: string;
       type: string;
       note?: string;
+      parser?: string;
       source_email_sender: string;
       source_email_title?: string;
       source_email_summary?: string;
@@ -52,6 +54,7 @@ function loadExistingKeyCounts(filePath: string): Map<string, number> {
         amount: record.amount,
         currency: record.currency,
         note: record.note,
+        parser: record.parser,
       });
       counts.set(key, (counts.get(key) || 0) + 1);
     }
@@ -64,6 +67,10 @@ function loadExistingKeyCounts(filePath: string): Map<string, number> {
 
 export async function exportToCsv(rows: TransactionRow[], outputPath?: string): Promise<string> {
   const filePath = path.resolve(process.cwd(), outputPath || 'transactions.csv');
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
   const fileExists = fs.existsSync(filePath);
 
   const existingCounts = loadExistingKeyCounts(filePath);
@@ -96,6 +103,7 @@ export async function exportToCsv(rows: TransactionRow[], outputPath?: string): 
       { id: 'amount', title: 'amount' },
       { id: 'type', title: 'type' },
       { id: 'note', title: 'note' },
+      { id: 'parser', title: 'parser' },
       { id: 'source_email_sender', title: 'source_email_sender' },
       { id: 'source_email_title', title: 'source_email_title' },
       { id: 'source_email_id', title: 'source_email_id' },

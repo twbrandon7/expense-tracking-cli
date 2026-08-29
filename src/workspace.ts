@@ -12,6 +12,7 @@ export interface ResolvedWorkspacePaths {
   workspaceDir: string;
   monthDir?: string;
   downloadsDir?: string;
+  transactionsDir: string;
   transactionsCsvPath: string;
   summaryCsvPath: string;
 }
@@ -31,6 +32,14 @@ export function resolveWorkspacePaths(options: WorkspaceOptions): ResolvedWorksp
     }
   }
 
+  const transactionsDir = monthDir
+    ? path.join(monthDir, 'transactions')
+    : path.join(baseWorkspace, 'transactions');
+
+  if (!fs.existsSync(transactionsDir)) {
+    fs.mkdirSync(transactionsDir, { recursive: true });
+  }
+
   const transactionsCsvPath = options.transactionsCsv
     ? path.resolve(process.cwd(), options.transactionsCsv)
     : monthDir
@@ -47,6 +56,7 @@ export function resolveWorkspacePaths(options: WorkspaceOptions): ResolvedWorksp
     workspaceDir: baseWorkspace,
     monthDir,
     downloadsDir,
+    transactionsDir,
     transactionsCsvPath,
     summaryCsvPath,
   };

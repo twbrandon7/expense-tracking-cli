@@ -4,12 +4,13 @@ dotenv.config();
 
 import fs from 'fs';
 import { Command } from 'commander';
+import path from 'path';
 import { loadConfig } from './config';
 import { authenticateInteractive, getAuthenticatedClient } from './auth/gmail-auth';
 import { fetchBankAttachments } from './gmail/fetcher';
 import { ParserChain } from './parsers/chain';
 import { exportToCsv } from './storage/csv';
-import { readTransactionsCsv, exportSummaryCsv, readSummaryCsv } from './storage/summary-csv';
+import { readTransactionsCsv, readTransactionsFromPath, exportSummaryCsv, readSummaryCsv } from './storage/summary-csv';
 import { loadClassificationConfig } from './classification/rules';
 import { aggregateTransactions } from './classification/aggregator';
 import { syncClassifiedSummaryToSheets } from './storage/sheets-sync';
@@ -61,7 +62,8 @@ export async function runFetchStep(options: {
   const authClient = await getAuthenticatedClient();
 
   const parserChain = new ParserChain();
-  const allTransactions: TransactionRow[] = [];
+  const createdCsvPaths: string[] = [];
+  let totalExtractedRows = 0;
 
   for (const bank of config.banks) {
     if (!bank.enabled) continue;
@@ -86,7 +88,16 @@ export async function runFetchStep(options: {
     for (const item of attachments) {
       try {
         const rows = await parserChain.parse(item.filePath, item.context, bank.parsers);
-        allTransactions.push(...rows);
+        if (rows && rows.length > 0) {
+          const pdfBaseName = path.parse(item.filePath).name;
+          const individualCsvPath = options.outputPath && options.outputPath.endsWith('.csv')
+            ? path.resolve(process.cwd(), options.outputPath)
+            : path.join(paths.transactionsDir, `${pdfBaseName}.csv`);
+
+          const savedPath = await exportToCsv(rows, individualCsvPath);
+          createdCsvPaths.push(savedPath);
+          totalExtractedRows += rows.length;
+        }
       } catch (err: any) {
         console.error(`Failed to parse attachment ${item.filePath}:`, err.message || err);
       }
@@ -94,15 +105,15 @@ export async function runFetchStep(options: {
   }
 
   console.log(`\n==================================================`);
-  if (allTransactions.length > 0) {
-    const csvPath = await exportToCsv(allTransactions, paths.transactionsCsvPath);
-    console.log(`Fetch complete! Extracted ${allTransactions.length} transaction rows -> ${csvPath}`);
+  if (createdCsvPaths.length > 0) {
+    console.log(`Fetch complete! Extracted ${totalExtractedRows} total transaction rows across ${createdCsvPaths.length} CSV files.`);
+    createdCsvPaths.forEach((p) => console.log(` - ${p}`));
     console.log(`==================================================\n`);
-    return csvPath;
+    return paths.transactionsDir;
   } else {
     console.log('Fetch complete! No transactions extracted.');
     console.log(`==================================================\n`);
-    return paths.transactionsCsvPath;
+    return paths.transactionsDir;
   }
 }
 
@@ -121,12 +132,18 @@ export async function runClassifyStep(options: {
     summaryCsv: options.outputPath,
   });
 
-  console.log(`Reading transactions from: ${paths.transactionsCsvPath}...`);
-  if (!fs.existsSync(paths.transactionsCsvPath)) {
-    throw new Error(`Transactions CSV not found at: ${paths.transactionsCsvPath}`);
+  const targetInput = options.inputPath
+    ? path.resolve(process.cwd(), options.inputPath)
+    : fs.existsSync(paths.transactionsDir)
+      ? paths.transactionsDir
+      : paths.transactionsCsvPath;
+
+  console.log(`Reading transactions from: ${targetInput}...`);
+  if (!fs.existsSync(targetInput)) {
+    throw new Error(`Transactions source not found at: ${targetInput}`);
   }
 
-  const rows = readTransactionsCsv(paths.transactionsCsvPath);
+  const rows = readTransactionsFromPath(targetInput);
   if (rows.length === 0) {
     console.log('No transactions found to classify.');
     return paths.summaryCsvPath;

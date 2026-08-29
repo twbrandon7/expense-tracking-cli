@@ -29,10 +29,41 @@ export function readTransactionsCsv(filePath: string): TransactionRow[] {
     amount: parseFloat(r.amount) || 0,
     type: (r.type as TransactionType) || 'expense',
     note: r.note || '',
+    parser: r.parser || undefined,
     source_email_sender: r.source_email_sender || '',
     source_email_title: r.source_email_title || '',
     source_email_id: r.source_email_id || ''
   }));
+}
+
+export function readTransactionsFromPath(targetPath: string): TransactionRow[] {
+  const resolvedPath = path.resolve(process.cwd(), targetPath);
+  if (!fs.existsSync(resolvedPath)) {
+    throw new Error(`Transactions path not found: ${resolvedPath}`);
+  }
+
+  const stat = fs.statSync(resolvedPath);
+  if (stat.isDirectory()) {
+    const files = fs.readdirSync(resolvedPath)
+      .filter((file) => file.endsWith('.csv'))
+      .sort();
+    
+    if (files.length === 0) {
+      console.warn(`[Storage] No .csv files found in transactions directory: ${resolvedPath}`);
+      return [];
+    }
+
+    const allRows: TransactionRow[] = [];
+    for (const file of files) {
+      const fullFilePath = path.join(resolvedPath, file);
+      const rows = readTransactionsCsv(fullFilePath);
+      console.log(`[Storage] Loaded ${rows.length} transactions from ${file}`);
+      allRows.push(...rows);
+    }
+    return allRows;
+  }
+
+  return readTransactionsCsv(resolvedPath);
 }
 
 export async function exportSummaryCsv(

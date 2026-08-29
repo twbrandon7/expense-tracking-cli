@@ -3,19 +3,19 @@ date_timezone: "Asia/Taipei"
 spreadsheet_id: "1rsP0VwtdZQOd--00HIswMNm5_Brj9n-H3tY-RnUUpF8"
 
 banks:
-  # - bank_id: esun
-  #   bank_name: "E.SUN Bank"
-  #   enabled: true
-  #   sender: "Service@info.esunbank.com"
-  #   title_pattern: '玉山銀行簽帳金融卡電子對帳單 \((?<roc_year>\d{2,3})(?<month>\d{1,2})\)'
-  #   offset:
-  #     year_offset: 0
-  #     month_offset: 0
-  #   attachment:
-  #     file_extension: ".pdf"
-  #     encrypted: true
-  #   parsers:
-  #     - type: "esun-debit"
+  - bank_id: esun
+    bank_name: "E.SUN Bank"
+    enabled: true
+    sender: "Service@info.esunbank.com"
+    title_pattern: '玉山銀行簽帳金融卡電子對帳單 \((?<roc_year>\d{2,3})(?<month>\d{1,2})\)'
+    offset:
+      year_offset: 0
+      month_offset: 0
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
+    parsers:
+      - type: "esun-debit"
   - bank_id: esun-statement
     bank_name: "E.SUN Bank"
     enabled: true
@@ -29,17 +29,17 @@ banks:
       encrypted: true
     parsers:
       - type: "esun-statement"
-  # - bank_id: ctbc
-  #   bank_name: "CTBC Bank"
-  #   enabled: true
-  #   sender: "ebill@estats.ctbcbank.com"
-  #   title_pattern: '中國信託信用卡電子帳單 (?<roc_year>\d{3})(?<month>\d{2})'
-  #   offset:
-  #     year_offset: 0
-  #     month_offset: -1
-  #   attachment:
-  #     file_extension: ".pdf"
-  #     encrypted: true
-  #   parsers:
-  #     - type: "ctbc-credit"
+  - bank_id: ctbc
+    bank_name: "CTBC Bank"
+    enabled: true
+    sender: "ebill@estats.ctbcbank.com"
+    title_pattern: '中國信託信用卡電子帳單 (?<roc_year>\d{3})(?<month>\d{2})'
+    offset:
+      year_offset: 0
+      month_offset: -1
+    attachment:
+      file_extension: ".pdf"
+      encrypted: true
+    parsers:
+      - type: "ctbc-credit"
 
