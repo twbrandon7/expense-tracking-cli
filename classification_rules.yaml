@@ -7,10 +7,6 @@ user_rules:
       is_regex: false
     type: 計畫
     sub_type: 房租/房貸+管理費
-  - pattern: 房貸.*利息
-    type: 計畫
-    sub_type: 房貸(每月利息)
-    is_regex: true
   - pattern: 水費
     type: 計畫
     sub_type: 水費(每雙月1次)
@@ -18,7 +14,7 @@ user_rules:
     type: 計畫
     sub_type: 電費(每單月1次)
     is_regex: true
-  - pattern: 中華電信|遠傳|台灣大哥大|手機月租
+  - pattern: 連結帳戶交易 3*9-6051225260
     type: 計畫
     sub_type: 手機月租費
     is_regex: true
