@@ -5,6 +5,15 @@ export class CreditCardPaymentFilter implements TransactionFilter {
   readonly name = 'CreditCardPaymentFilter';
 
   shouldFilter(row: TransactionRow): boolean {
+    const isEsunStatement =
+      row.parser === 'esun-statement' ||
+      (row.source_email_sender && row.source_email_sender.includes('estatement@esunbank.com')) ||
+      (row.source_email_title && row.source_email_title.includes('綜合對帳單'));
+
+    if (!isEsunStatement) {
+      return false;
+    }
+
     const desc = row.description || '';
     const note = row.note || '';
     const combined = `${desc} ${note}`;
