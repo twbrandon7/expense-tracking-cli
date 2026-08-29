@@ -279,6 +279,7 @@ export class CtbcCreditPdfParser implements BankParser {
         amount,
         type,
         note: noteParts.length > 0 ? noteParts.join(', ') : undefined,
+        parser: this.id,
         source_email_sender: context.emailSender,
         source_email_title: context.emailSubject,
         source_email_id: context.emailId,

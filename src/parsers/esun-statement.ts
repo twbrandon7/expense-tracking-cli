@@ -86,11 +86,6 @@ export class EsunStatementPdfParser implements BankParser {
         const descItems = rowItems.filter((i) => i.x >= 70 && i.x <= 160);
         const rawDesc = descItems.map((i) => i.str).join('').trim();
 
-        // 1. Filter out card purchases (簽帳消費) as they are tracked in card statements
-        if (rawDesc.includes('簽帳消費')) {
-          continue;
-        }
-
         // Withdrawal amount column at x ~ 180-235
         const withdrawItem = rowItems.find(
           (i) => i.x >= 180 && i.x <= 235 && /^[\d,]+(\.\d+)?$/.test(i.str)
@@ -123,15 +118,6 @@ export class EsunStatementPdfParser implements BankParser {
           counterparty = codeRemark.str;
         }
 
-        // 2. Filter out credit card bill payments (e.g. transfer to CTBC 822 4311953504***336)
-        const combinedCp = `${remark} ${counterparty}`;
-        if (
-          combinedCp.includes('822 4311953504***336') ||
-          (counterparty.includes('822') && counterparty.includes('336'))
-        ) {
-          continue;
-        }
-
         const isDeposit = Boolean(depositItem);
         const rawAmountStr = isDeposit ? depositItem!.str : withdrawItem!.str;
         const amount = parseFloat(rawAmountStr.replace(/,/g, '')) || 0;
@@ -162,6 +148,7 @@ export class EsunStatementPdfParser implements BankParser {
           amount,
           type,
           note: noteParts.length > 0 ? noteParts.join(', ') : undefined,
+          parser: this.id,
           source_email_sender: context.emailSender,
           source_email_title: context.emailSubject,
           source_email_id: context.emailId,

@@ -38,6 +38,7 @@ export class PdfParseBankParser implements BankParser {
             currency: currency || 'TWD',
             amount: cleanAmount,
             type: 'expense',
+            parser: this.id,
             source_email_sender: context.emailSender,
             source_email_title: context.emailSubject,
             source_email_id: context.emailId,

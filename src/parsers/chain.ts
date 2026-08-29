@@ -50,6 +50,11 @@ export class ParserChain {
         console.log(`[ParserChain] Running parser "${parser.id}" on ${filePath}...`);
         const rows = await parser.parse(filePath, context);
         if (rows && rows.length > 0) {
+          rows.forEach((r) => {
+            if (!r.parser) {
+              r.parser = parser.id;
+            }
+          });
           console.log(`[ParserChain] Parser "${parser.id}" succeeded! Extracted ${rows.length} rows.`);
           return rows;
         }

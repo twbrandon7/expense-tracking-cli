@@ -7,6 +7,7 @@ export interface TransactionRow {
   amount: number;
   type: TransactionType;
   note?: string;
+  parser?: string;          // e.g. esun-statement, ctbc-credit, etc.
   source_email_sender: string;
   source_email_title: string;
   source_email_id: string;

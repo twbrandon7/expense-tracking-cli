@@ -90,6 +90,7 @@ ${extractedText.slice(0, 10000)}
         amount: cleanAmount,
         type: validateTransactionType(item.type),
         note: item.note,
+        parser: this.id,
         source_email_sender: context.emailSender,
         source_email_title: context.emailSubject,
         source_email_id: context.emailId,
