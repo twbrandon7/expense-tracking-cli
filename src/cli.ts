@@ -173,6 +173,7 @@ export async function runSyncSheetsStep(options: {
   configPath?: string;
   spreadsheetId?: string;
   sheetName?: string;
+  overrideSheet?: boolean;
 }): Promise<void> {
   parseYearMonth(options.month);
 
@@ -209,6 +210,7 @@ export async function runSyncSheetsStep(options: {
     yearMonth: options.month,
     sheetName,
     summaryRows,
+    overrideSheet: options.overrideSheet,
   });
 
   console.log(`\n==================================================`);
@@ -296,6 +298,7 @@ program
   .option('-c, --config <path>', 'Path to YAML configuration file', 'config.yaml')
   .option('-s, --spreadsheet-id <id>', 'Google Sheets spreadsheet ID (overrides config.yaml)')
   .option('--sheet-name <name>', 'Specific sheet tab name (overrides config.yaml sheet_name)')
+  .option('--override-sheet', 'Override existing cell values and notes in sheet instead of appending')
   .action(async (options) => {
     try {
       await runSyncSheetsStep({
@@ -305,6 +308,7 @@ program
         configPath: options.config,
         spreadsheetId: options.spreadsheetId,
         sheetName: options.sheetName,
+        overrideSheet: options.overrideSheet,
       });
     } catch (err: any) {
       console.error('Sync-sheets command failed:', err.message || err);
@@ -326,6 +330,7 @@ program
   .option('--skip-fetch', 'Skip fetching email attachments and parsing')
   .option('--skip-classify', 'Skip classifying transactions into summary CSV')
   .option('--skip-sheets', 'Skip syncing summary to Google Sheets')
+  .option('--override-sheet', 'Override existing cell values and notes in sheet instead of appending')
   .action(async (options) => {
     try {
       console.log(`\n==================================================`);
@@ -370,6 +375,7 @@ program
           configPath: options.config,
           spreadsheetId: options.spreadsheetId,
           sheetName: options.sheetName,
+          overrideSheet: options.overrideSheet,
         });
       } else {
         console.log(`[Pipeline Step 3/3] Skipping Google Sheets sync step (--skip-sheets).`);

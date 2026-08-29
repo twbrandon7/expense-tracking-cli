@@ -7,6 +7,7 @@ export interface SyncOptions {
   yearMonth: string; // YYYY-MM, e.g. "2026-07"
   sheetName?: string; // Optional exact or approximate sheet tab name
   summaryRows: ClassifiedSummaryRow[];
+  overrideSheet?: boolean;
 }
 
 export interface SyncResult {
@@ -160,7 +161,7 @@ export function combineNote(existingNote: string | undefined, newComment: string
 }
 
 export async function syncClassifiedSummaryToSheets(options: SyncOptions): Promise<SyncResult> {
-  const { spreadsheetId, yearMonth, summaryRows } = options;
+  const { spreadsheetId, yearMonth, summaryRows, overrideSheet = false } = options;
 
   const [yearStr, monthStr] = yearMonth.split('-');
   const year = parseInt(yearStr, 10);
@@ -169,6 +170,8 @@ export async function syncClassifiedSummaryToSheets(options: SyncOptions): Promi
   if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
     throw new Error(`Invalid yearMonth format: "${yearMonth}". Expected YYYY-MM.`);
   }
+
+  console.log(`Sync mode: ${overrideSheet ? 'Override existing records (--override-sheet)' : 'Append to existing records'}`);
 
   const sheets = await getSheetsClient();
 
@@ -509,11 +512,18 @@ export async function syncClassifiedSummaryToSheets(options: SyncOptions): Promi
     const updateRequests: sheets_v4.Schema$Request[] = [];
 
     for (const upd of updatesToApply) {
-      const existingFormulaOrVal = getCellFormulaOrValue(upd.rowIndex, targetColIndex);
-      const existingNote = getCellNote(upd.rowIndex, targetColIndex);
+      let combinedFormulaVal: string;
+      let combinedNoteVal: string;
 
-      const combinedFormulaVal = combineFormula(existingFormulaOrVal, upd.newFormula);
-      const combinedNoteVal = combineNote(existingNote, upd.newComment);
+      if (overrideSheet) {
+        combinedFormulaVal = upd.newFormula;
+        combinedNoteVal = upd.newComment || '';
+      } else {
+        const existingFormulaOrVal = getCellFormulaOrValue(upd.rowIndex, targetColIndex);
+        const existingNote = getCellNote(upd.rowIndex, targetColIndex);
+        combinedFormulaVal = combineFormula(existingFormulaOrVal, upd.newFormula);
+        combinedNoteVal = combineNote(existingNote, upd.newComment);
+      }
 
       updateRequests.push({
         updateCells: {
