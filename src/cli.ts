@@ -35,6 +35,8 @@ export async function runFetchStep(options: {
   workspace?: string;
   configPath?: string;
   outputPath?: string;
+  reparse?: boolean;
+  refetch?: boolean;
 }): Promise<string> {
   const targetYearMonth = parseYearMonth(options.month);
   const configPath = options.configPath || 'config.yaml';
@@ -77,7 +79,8 @@ export async function runFetchStep(options: {
       bank,
       targetYearMonth,
       statementPassword,
-      paths.downloadsDir
+      paths.downloadsDir,
+      { refetch: options.refetch }
     );
 
     if (attachments.length === 0) {
@@ -87,13 +90,22 @@ export async function runFetchStep(options: {
 
     for (const item of attachments) {
       try {
+        const pdfBaseName = path.parse(item.filePath).name;
+        const individualCsvPath = options.outputPath && options.outputPath.endsWith('.csv')
+          ? path.resolve(process.cwd(), options.outputPath)
+          : path.join(paths.transactionsDir, `${pdfBaseName}.csv`);
+
+        if (fs.existsSync(individualCsvPath) && !options.reparse) {
+          console.log(`  [Cache Hit] Parsed CSV already exists: ${individualCsvPath}`);
+          const existingRows = readTransactionsCsv(individualCsvPath);
+          createdCsvPaths.push(individualCsvPath);
+          totalExtractedRows += existingRows.length;
+          continue;
+        }
+
+        console.log(`  Parsing statement attachment: ${item.filePath}...`);
         const rows = await parserChain.parse(item.filePath, item.context, bank.parsers);
         if (rows && rows.length > 0) {
-          const pdfBaseName = path.parse(item.filePath).name;
-          const individualCsvPath = options.outputPath && options.outputPath.endsWith('.csv')
-            ? path.resolve(process.cwd(), options.outputPath)
-            : path.join(paths.transactionsDir, `${pdfBaseName}.csv`);
-
           const savedPath = await exportToCsv(rows, individualCsvPath);
           createdCsvPaths.push(savedPath);
           totalExtractedRows += rows.length;
@@ -106,7 +118,7 @@ export async function runFetchStep(options: {
 
   console.log(`\n==================================================`);
   if (createdCsvPaths.length > 0) {
-    console.log(`Fetch complete! Extracted ${totalExtractedRows} total transaction rows across ${createdCsvPaths.length} CSV files.`);
+    console.log(`Fetch complete! Extracted/loaded ${totalExtractedRows} total transaction rows across ${createdCsvPaths.length} CSV files.`);
     createdCsvPaths.forEach((p) => console.log(` - ${p}`));
     console.log(`==================================================\n`);
     return paths.transactionsDir;
@@ -250,6 +262,8 @@ program
   .option('-w, --workspace <dir>', 'Root workspace directory', 'workspace')
   .option('-c, --config <path>', 'Path to YAML configuration file', 'config.yaml')
   .option('-o, --output <path>', 'Path to output transactions CSV (overrides default workspace path)')
+  .option('--refetch', 'Force re-fetching attachments from Gmail even if local downloads exist')
+  .option('--reparse', 'Force re-parsing statement attachments and overwrite existing CSVs')
   .action(async (options) => {
     try {
       await runFetchStep({
@@ -257,6 +271,8 @@ program
         workspace: options.workspace,
         configPath: options.config,
         outputPath: options.output,
+        refetch: options.refetch,
+        reparse: options.reparse,
       });
     } catch (err: any) {
       console.error('Fetch command failed:', err.message || err);
@@ -327,6 +343,8 @@ program
   .option('-o, --summary-csv <path>', 'Path to summary CSV (overrides default workspace path)')
   .option('-s, --spreadsheet-id <id>', 'Google Sheets spreadsheet ID (overrides config.yaml)')
   .option('--sheet-name <name>', 'Specific sheet tab name (overrides config.yaml sheet_name)')
+  .option('--refetch', 'Force re-fetching attachments from Gmail even if local downloads exist')
+  .option('--reparse', 'Force re-parsing statement attachments and overwrite existing CSVs')
   .option('--skip-fetch', 'Skip fetching email attachments and parsing')
   .option('--skip-classify', 'Skip classifying transactions into summary CSV')
   .option('--skip-sheets', 'Skip syncing summary to Google Sheets')
@@ -345,6 +363,8 @@ program
           workspace: options.workspace,
           configPath: options.config,
           outputPath: options.transactionsCsv,
+          refetch: options.refetch,
+          reparse: options.reparse,
         });
       } else {
         console.log(`[Pipeline Step 1/3] Skipping fetch step (--skip-fetch).`);

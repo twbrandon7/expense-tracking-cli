@@ -67,15 +67,48 @@ export async function fetchBankAttachments(
   bank: BankConfig,
   targetYearMonth: { year: number; month: number },
   password?: string,
-  downloadsDir?: string
+  downloadsDir?: string,
+  options?: { refetch?: boolean }
 ): Promise<FetchedAttachment[]> {
-  const gmail = google.gmail({ version: 'v1', auth: authClient });
-
   if (!bank.enabled) {
     console.log(`Bank ${bank.bank_name} (${bank.bank_id}) is disabled in configuration. Skipping.`);
     return [];
   }
 
+  const bankDownloadDir = ensureBankDownloadDir(bank.bank_id, downloadsDir);
+  const pdfExt = (bank.attachment.file_extension || '.pdf').toLowerCase();
+
+  // Check if bank statement files are already downloaded locally
+  if (!options?.refetch && fs.existsSync(bankDownloadDir)) {
+    const existingFiles = fs.readdirSync(bankDownloadDir).filter((f) => f.toLowerCase().endsWith(pdfExt));
+    if (existingFiles.length > 0) {
+      console.log(`  [Cache Hit] Using ${existingFiles.length} downloaded statement file(s) for bank: ${bank.bank_name} (${bank.bank_id})`);
+      const cachedResults: FetchedAttachment[] = [];
+
+      for (const filename of existingFiles) {
+        const fullPath = path.join(bankDownloadDir, filename);
+        // Filename format: <emailId>_<originalName>
+        const firstUnderscore = filename.indexOf('_');
+        const emailId = firstUnderscore > 0 ? filename.substring(0, firstUnderscore) : '';
+        const rawTitle = firstUnderscore > 0 ? filename.substring(firstUnderscore + 1).replace(new RegExp(`\\${pdfExt}$`, 'i'), '') : filename;
+
+        cachedResults.push({
+          filePath: fullPath,
+          context: {
+            bankConfig: bank,
+            billingPeriod: targetYearMonth,
+            emailSender: bank.sender,
+            emailSubject: rawTitle,
+            emailId: emailId || bank.bank_id,
+            password,
+          },
+        });
+      }
+      return cachedResults;
+    }
+  }
+
+  const gmail = google.gmail({ version: 'v1', auth: authClient });
   const { afterDate, beforeDate } = calculateSearchWindow(targetYearMonth.year, targetYearMonth.month);
   const query = `from:${bank.sender} after:${afterDate} before:${beforeDate}`;
   console.log(`Searching Gmail for bank ${bank.bank_name} using query: "${query}"...`);
@@ -160,9 +193,7 @@ export async function fetchBankAttachments(
   };
 
   const results: FetchedAttachment[] = [];
-  const bankDownloadDir = ensureBankDownloadDir(bank.bank_id, downloadsDir);
   const parts = matched.msg.payload?.parts || [];
-  const pdfExt = bank.attachment.file_extension || '.pdf';
 
   for (const part of parts) {
     const filename = part.filename;
