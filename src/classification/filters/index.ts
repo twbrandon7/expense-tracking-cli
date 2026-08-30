@@ -3,12 +3,14 @@ export * from './debit-card-purchase-filter';
 export * from './credit-card-payment-filter';
 export * from './withdrawal-filter';
 export * from './self-transfer-filter';
+export * from './easycard-topup-filter';
 
 import { FilterPipeline } from './filter';
 import { DebitCardPurchaseFilter } from './debit-card-purchase-filter';
 import { CreditCardPaymentFilter } from './credit-card-payment-filter';
 import { WithdrawalFilter } from './withdrawal-filter';
 import { SelfTransferFilter } from './self-transfer-filter';
+import { EasyCardTopupFilter } from './easycard-topup-filter';
 
 export function createDefaultFilterPipeline(): FilterPipeline {
   return new FilterPipeline([
@@ -16,5 +18,7 @@ export function createDefaultFilterPipeline(): FilterPipeline {
     new CreditCardPaymentFilter(),
     new WithdrawalFilter(),
     new SelfTransferFilter(),
+    new EasyCardTopupFilter(),
   ]);
 }
+
