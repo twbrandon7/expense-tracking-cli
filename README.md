@@ -7,10 +7,10 @@ Automated CLI tool to retrieve electronic bank statements and bills from Gmail, 
 ## Features
 
 - **Gmail OAuth2 Integration**: Secure desktop authorization to read statement emails.
-- **Attachment Caching**: Automatically downloads and caches PDF attachments locally.
-- **Bank-Specific & Fallback Parsers**: High-precision parsers for E.SUN (`esun-debit`) and CTBC (`ctbc-credit` with Gemini OCR for bitmap merchant names), plus generic fallback parser chain (`pdf-parse` -> `gemini`).
+- **Attachment & Transaction Caching**: Automatically downloads and caches PDF attachments, and caches parsed transaction CSVs locally to avoid redundant AI/OCR parsing and duplicate records.
+- **Bank-Specific & Fallback Parsers**: High-precision parsers for E.SUN (`esun-debit`, `esun-statement`) and CTBC (`ctbc-credit` with Gemini OCR for bitmap merchant names), plus generic fallback parser chain (`pdf-parse` -> `gemini`).
 - **Billing Offset Calculation**: Handles mismatch between email statement dates and actual transaction billing cycles.
-- **Structured CSV Export**: Saves clean, normalized transaction rows into `transactions.csv`.
+- **Structured CSV Export & Aggregation**: Saves clean, normalized transaction rows and produces category-aggregated summary tables with rule-based/code-based classification.
 
 ---
 
@@ -18,7 +18,7 @@ Automated CLI tool to retrieve electronic bank statements and bills from Gmail, 
 
 - **Node.js**: v18.0.0 or higher
 - **Google Cloud Account**: For Gmail API OAuth 2.0 Client ID
-- **Google Gemini API Key**: For fallback parsing via Gemini 2.5 Flash
+- **Google Gemini API Key**: For fallback parsing and OCR via Gemini 2.5 Flash
 
 ---
 
@@ -68,10 +68,11 @@ Create a `.env` file in the project root to configure your Gemini API key:
 cp .env.example .env 2>/dev/null || touch .env
 ```
 
-Add your Gemini API Key to `.env`:
+Add your Gemini API Key and Statement Password to `.env`:
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
+STATEMENT_PASSWORD=your_pdf_password_here
 ```
 
 > **Note**: Get your Gemini API key from [Google AI Studio](https://aistudio.google.com/).
@@ -152,6 +153,9 @@ workspace/
     ├── downloads/
     │   ├── ctbc/
     │   └── esun/
+    ├── transactions/
+    │   ├── 19fd76038606128f_CTBC_card_Estatement_11508.csv
+    │   └── 19ff35906a913f93_玉山銀行綜合對帳單.csv
     ├── transactions.csv
     └── classified_summary.csv
 ```
@@ -162,12 +166,18 @@ Custom base workspace directories can be specified with `-w, --workspace <dir>`.
 
 ### 4. Fetch & Parse Statements
 
-Downloads bank statement PDFs for the specified billing month into `workspace/<YYYY-MM>/downloads/` and extracts transactions into `workspace/<YYYY-MM>/transactions.csv`:
+Downloads bank statement PDFs for the specified billing month into `workspace/<YYYY-MM>/downloads/` and extracts transactions into `workspace/<YYYY-MM>/transactions/`:
 
 ```bash
 npm run fetch -- -m 2026-07
 # or
 npx ts-node src/cli.ts fetch --month 2026-07
+
+# Force re-fetching statement attachments from Gmail
+npx ts-node src/cli.ts fetch --month 2026-07 --refetch
+
+# Force re-parsing and overwriting existing transaction CSVs
+npx ts-node src/cli.ts fetch --month 2026-07 --reparse
 ```
 
 Options:
@@ -175,23 +185,25 @@ Options:
 - `-w, --workspace <dir>` (Default: `workspace`)
 - `-c, --config <path>` (Default: `config.yaml`)
 - `-o, --output <path>` (Override default transactions CSV path)
+- `--refetch` (Force re-fetching attachments from Gmail even if local downloads exist)
+- `--reparse` (Force re-parsing statement attachments and overwrite existing CSVs)
 
 ---
 
 ### 5. Classify Transactions & Aggregation
 
-Classifies raw transactions according to rules and Gemini reasoning, producing aggregated summary rows into `workspace/<YYYY-MM>/classified_summary.csv`:
+Classifies raw transactions according to rules, registered classifiers, and Gemini reasoning, producing aggregated summary rows into `workspace/<YYYY-MM>/classified_summary.csv`:
 
 ```bash
 npm run classify -- -m 2026-07
 # or custom input/output
-npx ts-node src/cli.ts classify -i workspace/2026-07/transactions.csv -o workspace/2026-07/classified_summary.csv
+npx ts-node src/cli.ts classify -m 2026-07
 ```
 
 Options:
 - `-m, --month <YYYY-MM>` (Target month for workspace path resolution)
 - `-w, --workspace <dir>` (Default: `workspace`)
-- `-i, --input <path>` (Override input transactions CSV)
+- `-i, --input <path>` (Override input transactions CSV or directory)
 - `-o, --output <path>` (Override output summary CSV)
 - `-r, --rules <path>` (Default: `classification_rules.yaml`)
 - `-c, --config <path>` (Default: `config.yaml`)
@@ -215,6 +227,7 @@ Options:
 - `-c, --config <path>` (Default: `config.yaml`)
 - `-s, --spreadsheet-id <id>` (Google Sheets spreadsheet ID override)
 - `--sheet-name <name>` (Specific sheet tab name override)
+- `--override-sheet` (Override existing cell values and notes in sheet instead of appending)
 
 ---
 
@@ -226,6 +239,10 @@ Executes the complete end-to-end workflow (`fetch` -> `classify` -> `sync-sheets
 npm run run -- -m 2026-07
 # or
 npx ts-node src/cli.ts run -m 2026-07
+
+# Run pipeline with force re-fetching from Gmail and/or re-parsing
+npx ts-node src/cli.ts run -m 2026-07 --refetch
+npx ts-node src/cli.ts run -m 2026-07 --reparse
 ```
 
 #### Skip specific steps:
