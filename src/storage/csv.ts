@@ -71,28 +71,6 @@ export async function exportToCsv(rows: TransactionRow[], outputPath?: string): 
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  const fileExists = fs.existsSync(filePath);
-
-  const existingCounts = loadExistingKeyCounts(filePath);
-  const currentKeyOccurrences = new Map<string, number>();
-  const newRows: TransactionRow[] = [];
-
-  for (const row of rows) {
-    const key = createRowKey(row);
-    const seenInBatch = currentKeyOccurrences.get(key) || 0;
-    const existingCount = existingCounts.get(key) || 0;
-
-    if (seenInBatch >= existingCount) {
-      newRows.push(row);
-    }
-
-    currentKeyOccurrences.set(key, seenInBatch + 1);
-  }
-
-  if (newRows.length === 0) {
-    console.log(`All ${rows.length} records already exist in ${filePath}. Skipped duplicate insertion.`);
-    return filePath;
-  }
 
   const csvWriter = createObjectCsvWriter({
     path: filePath,
@@ -108,10 +86,10 @@ export async function exportToCsv(rows: TransactionRow[], outputPath?: string): 
       { id: 'source_email_title', title: 'source_email_title' },
       { id: 'source_email_id', title: 'source_email_id' },
     ],
-    append: fileExists,
+    append: false,
   });
 
-  await csvWriter.writeRecords(newRows);
-  console.log(`Successfully written ${newRows.length} new transaction records to ${filePath}`);
+  await csvWriter.writeRecords(rows);
+  console.log(`Successfully written ${rows.length} transaction records to ${filePath}`);
   return filePath;
 }
