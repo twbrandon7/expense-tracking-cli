@@ -400,6 +400,19 @@ export async function syncClassifiedSummaryToSheets(options: SyncOptions): Promi
       const formulaVal = formatFormula(item.summaryRow.formula, item.summaryRow.amount);
       const commentVal = item.summaryRow.comment || '';
 
+      const monthCellFormat: sheets_v4.Schema$CellFormat = {
+        numberFormat: {
+          type: 'NUMBER',
+          pattern: '_(* #,##0_);_(* \\(#,##0\\);_(* "-"??_);_(@_)'
+        },
+        horizontalAlignment: 'CENTER',
+        textFormat: {
+          foregroundColor: { red: 0.7529412 },
+          fontFamily: 'Microsoft JhengHei',
+          fontSize: 12
+        }
+      };
+
       const requests: sheets_v4.Schema$Request[] = [
         {
           insertDimension: {
@@ -425,16 +438,23 @@ export async function syncClassifiedSummaryToSheets(options: SyncOptions): Promi
               {
                 values: [
                   {
-                    userEnteredValue: { stringValue: item.subType }
+                    userEnteredValue: { stringValue: item.subType },
+                    userEnteredFormat: {
+                      textFormat: {
+                        foregroundColor: { red: 0.7529412 },
+                        fontFamily: 'Microsoft JhengHei',
+                        fontSize: 12
+                      }
+                    }
                   }
                 ]
               }
             ],
-            fields: 'userEnteredValue'
+            fields: 'userEnteredValue,userEnteredFormat.textFormat'
           }
         },
         {
-          // Write Month Value & Note
+          // Write Month Value & Note with matching format
           updateCells: {
             range: {
               sheetId,
@@ -448,12 +468,13 @@ export async function syncClassifiedSummaryToSheets(options: SyncOptions): Promi
                 values: [
                   {
                     userEnteredValue: { formulaValue: formulaVal },
+                    userEnteredFormat: monthCellFormat,
                     note: commentVal
                   }
                 ]
               }
             ],
-            fields: 'userEnteredValue,note'
+            fields: 'userEnteredValue,userEnteredFormat,note'
           }
         },
         {
