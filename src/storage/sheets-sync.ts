@@ -328,7 +328,12 @@ export async function syncClassifiedSummaryToSheets(options: SyncOptions): Promi
   }[] = [];
 
   for (const sRow of summaryRows) {
-    const category: '計劃' | '非計劃' = normalizeName(sRow.type).includes('非') ? '非計劃' : '計劃';
+    const normType = normalizeName(sRow.type);
+    if (normType !== '計劃' && normType !== '非計劃') {
+      console.log(`[SheetsSync] Skipping non-expense summary row: [${sRow.type}] ${sRow.sub_type} ($${sRow.amount})`);
+      continue;
+    }
+    const category: '計劃' | '非計劃' = normType === '非計劃' ? '非計劃' : '計劃';
     const normSub = normalizeName(sRow.sub_type);
     const key = `${category}:${normSub}`;
 
