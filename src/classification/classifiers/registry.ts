@@ -1,10 +1,18 @@
 import { TransactionClassifier } from '../../types';
 import { HouseRentalClassifier } from './house-rental';
+import { CarLoanClassifier } from './car-loan';
+import { TelecomFeeClassifier } from './telecom-fee';
 
 export class ClassifierRegistry {
   private classifiers: Map<string, TransactionClassifier> = new Map();
 
-  constructor(initialClassifiers: TransactionClassifier[] = [new HouseRentalClassifier()]) {
+  constructor(
+    initialClassifiers: TransactionClassifier[] = [
+      new HouseRentalClassifier(),
+      new CarLoanClassifier(),
+      new TelecomFeeClassifier(),
+    ]
+  ) {
     for (const classifier of initialClassifiers) {
       this.register(classifier);
     }
