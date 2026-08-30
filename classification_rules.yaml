@@ -14,10 +14,13 @@ user_rules:
     type: 計畫
     sub_type: 電費(每單月1次)
     is_regex: true
-  - pattern: 連結帳戶交易 3*9-6051225260
+  - classifier: telecom_fee
+    options:
+      description: 連結帳戶交易
+      counterparty: 3*9-6051225260
+      is_regex: false
     type: 計畫
     sub_type: 手機月租費
-    is_regex: true
   - pattern: VULTR
     type: 計畫
     sub_type: 網站月租費 (vultr)
@@ -40,7 +43,11 @@ user_rules:
   - pattern: "2140"
     type: 計畫
     sub_type: 2140訂閱
-  - pattern: 車貸
+  - classifier: car_loan
+    options:
+      description: 行銀非約跨優 元*銀行
+      counterparty: "806 0020986000***529"
+      is_regex: false
     type: 計畫
     sub_type: 車貸
   - pattern: 紅包
@@ -97,7 +104,7 @@ llm_rules:
     sub_type: 旅行/住宿
   - pattern: 酷遊天
     type: 非計畫
-    sub_type: 娛樂
+    sub_type: 旅行/住宿
   - pattern: 台灣聯通
     type: 非計畫
     sub_type: 交通
@@ -119,15 +126,9 @@ llm_rules:
   - pattern: 證交款扣款
     type: 投資
     sub_type: 股票
-  - pattern: 中*郵政
-    type: 帳務處理
-    sub_type: 跨行轉帳
   - pattern: 連結帳戶交易
     type: 帳務處理
     sub_type: 連結帳戶轉帳
-  - pattern: 元*銀行
-    type: 帳務處理
-    sub_type: 跨行轉帳
   - pattern: 網路本行轉帳
     type: 帳務處理
     sub_type: 本行轉帳
